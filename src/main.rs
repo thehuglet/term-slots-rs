@@ -1,6 +1,8 @@
+mod constants;
 mod context;
 mod fps_counter;
 mod fps_limiter;
+mod playing_card;
 mod renderer;
 
 use crossterm::{
@@ -19,7 +21,8 @@ use crate::{
     context::Context,
     fps_counter::FPSCounter,
     fps_limiter::FPSLimiter,
-    renderer::{DrawCall, RGBA, RichText, Screen, compose_buffer, fill_screen_background},
+    playing_card::{PlayingCard, Suit, draw_playing_card_big},
+    renderer::{DrawCall, RGBA, RichText, Screen, compose_buffer},
 };
 
 /// Return `Result<false>` is as program exit signal.
@@ -46,6 +49,15 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<bool> {
     }
 
     let mut draw_calls: Vec<DrawCall> = vec![];
+
+    draw_calls.extend(draw_playing_card_big(
+        5,
+        5,
+        &PlayingCard {
+            suit: Suit::Spade,
+            rank: playing_card::Rank::King,
+        },
+    ));
 
     // Experiment
     draw_calls.push(DrawCall {
