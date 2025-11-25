@@ -1,0 +1,157 @@
+mod context;
+mod fps_counter;
+mod fps_limiter;
+mod renderer;
+
+use crossterm::{
+    cursor,
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseEventKind},
+    execute, queue,
+    style::{
+        self, Attributes, Color, ContentStyle, Print, ResetColor, SetBackgroundColor, SetStyle,
+    },
+    terminal::{self, ClearType},
+};
+use rand::Rng;
+use std::{
+    cmp::max,
+    io::{self, Stdout, Write},
+    time,
+};
+
+use crate::{
+    context::Context,
+    fps_counter::FPSCounter,
+    fps_limiter::FPSLimiter,
+    renderer::{DrawCall, RGBA, RichText, Screen, compose_buffer, fill_screen_background},
+};
+
+/// Return `Result<false>` is as program exit signal.
+fn tick(ctx: &mut Context, dt: f64, stdout: &mut Stdout) -> io::Result<bool> {
+    // Dirty inline input handling for now
+    if event::poll(time::Duration::from_millis(0))? {
+        match event::read()? {
+            Event::Key(key_event) => {
+                if key_event.code == KeyCode::Esc || key_event.code == KeyCode::Char('q') {
+                    return Ok(false);
+                }
+            }
+            Event::Mouse(mouse_event) => {
+                if mouse_event.kind == MouseEventKind::Moved {
+                    ctx.mouse_pos = (mouse_event.column, mouse_event.row);
+                }
+            }
+            _ => {}
+        }
+    }
+    // FPS counter test
+    ctx.fps_counter.update(dt);
+    // let fps_text = format!("FPS: {:.2}", ctx.fps_counter.fps());
+    // queue!(stdout, cursor::MoveTo(0, 0), Print(fps_text))?;
+
+    fill_screen_background(
+        &mut ctx.screen.new_buffer,
+        RGBA {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 1.0,
+        },
+    );
+    let mut draw_calls: Vec<DrawCall> = vec![];
+
+    // Experiment
+    draw_calls.push(DrawCall {
+        x: ctx.mouse_pos.0 as usize,
+        y: ctx.mouse_pos.1 as usize,
+        text: RichText::new("boop"),
+    });
+
+    draw_calls.push(DrawCall {
+        x: 0,
+        y: 0,
+        text: RichText::new(format!("FPS: {:.2}", ctx.fps_counter.fps())),
+    });
+
+    compose_buffer(&mut ctx.screen.new_buffer, &draw_calls);
+    let diff = ctx.screen.diff_buffers();
+
+    for (x, y, cell) in diff {
+        // TODO: add alpha blending support later
+        let fg_color = Color::Rgb {
+            r: cell.fg.r,
+            g: cell.fg.g,
+            b: cell.fg.b,
+        };
+
+        let bg_color = Color::Rgb {
+            r: cell.bg.r,
+            g: cell.bg.g,
+            b: cell.bg.b,
+        };
+
+        let style: ContentStyle = ContentStyle {
+            foreground_color: Some(fg_color),
+            background_color: Some(bg_color),
+            underline_color: None,
+            attributes: Attributes::none(),
+        };
+
+        queue!(
+            stdout,
+            cursor::MoveTo(x as u16, y as u16),
+            SetStyle(style),
+            Print(cell.ch)
+        )?;
+    }
+
+    stdout.flush()?;
+    ctx.screen.swap_buffers();
+    Ok(true)
+}
+
+fn main() -> io::Result<()> {
+    let mut stdout = io::stdout();
+
+    terminal::enable_raw_mode()?;
+    execute!(
+        stdout,
+        terminal::EnterAlternateScreen,
+        terminal::DisableLineWrap,
+        cursor::Hide,
+        EnableMouseCapture
+    )?;
+
+    let term_size: (u16, u16) = terminal::size()?;
+
+    let mut ctx = Context {
+        screen: Screen::new(
+            term_size.0 as usize,
+            term_size.1 as usize,
+            RGBA::from_u8(0, 0, 0, 1.0),
+        ),
+        mouse_pos: (0, 0),
+        game_time: 0.0,
+        fps_counter: FPSCounter::new(0.08),
+    };
+
+    let mut fps_limiter = FPSLimiter::new(0.0, 0.001, 0.002);
+
+    'game_loop: loop {
+        let dt: f64 = fps_limiter.wait();
+
+        if !tick(&mut ctx, dt, &mut stdout)? {
+            break 'game_loop;
+        }
+    }
+
+    execute!(
+        stdout,
+        terminal::LeaveAlternateScreen,
+        cursor::Show,
+        DisableMouseCapture
+    )?;
+    terminal::disable_raw_mode()?;
+
+    Ok(())
+}
