@@ -65,17 +65,17 @@ impl RichText {
         }
     }
 
-    pub fn set_fg(mut self, fg: RGBA) -> Self {
+    pub fn with_fg(mut self, fg: RGBA) -> Self {
         self.fg = fg;
         self
     }
 
-    pub fn set_bg(mut self, bg: RGBA) -> Self {
+    pub fn with_bg(mut self, bg: RGBA) -> Self {
         self.bg = bg;
         self
     }
 
-    pub fn set_bold(mut self, value: bool) -> Self {
+    pub fn with_bold(mut self, value: bool) -> Self {
         self.bold = value;
         self
     }
@@ -114,6 +114,7 @@ impl Screen {
 
     pub fn swap_buffers(&mut self) {
         std::mem::swap(&mut self.old_buffer, &mut self.new_buffer);
+        fill_screen_background(&mut self.new_buffer, RGBA::from_u8(0, 0, 0, 1.0))
     }
 
     pub fn diff_buffers(&self) -> Vec<(usize, usize, &Cell)> {
@@ -188,10 +189,25 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
             }
 
             let cell = &mut buf.cells[y * buf.width + px];
+
             cell.ch = ch;
-            cell.fg = seg.fg;
-            cell.bg = seg.bg;
             cell.bold = seg.bold;
+
+            // Skip blending for cases where it wouldn't do anything visually
+            let skip_fg_blending: bool = seg.fg.a == 1.0 || seg.fg.a == 0.0 || ch == ' ';
+            let skip_bg_blending: bool = seg.bg.a == 1.0 || seg.fg.a == 0.0;
+
+            if skip_fg_blending {
+                cell.fg = seg.fg
+            } else {
+                cell.fg = blend_source_over(&cell.fg, &seg.fg);
+            }
+
+            if skip_bg_blending {
+                cell.bg = seg.bg
+            } else {
+                cell.bg = blend_source_over(&cell.bg, &seg.bg);
+            }
 
             px += 1;
         }
@@ -199,11 +215,42 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
 }
 
 pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: RGBA) {
-    // optional default foreground
     for cell in buf.cells.iter_mut() {
         cell.ch = ' ';
         cell.fg = RGBA::from_u8(0, 0, 0, 1.0);
         cell.bg = bg;
         cell.bold = false;
     }
+}
+
+/// Helper for drawing rectangles
+pub fn draw_rect(x: usize, y: usize, w: usize, h: usize, color: RGBA) -> Vec<DrawCall> {
+    let mut draw_calls: Vec<DrawCall> = vec![];
+
+    for row in 0..h {
+        draw_calls.push(DrawCall {
+            x: x,
+            y: y + row,
+            text: RichText::new(" ".repeat(w)).with_bg(color),
+        })
+    }
+
+    draw_calls
+}
+
+pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
+    let ta = top.a.clamp(0.0, 1.0);
+    let ba = bottom.a.clamp(0.0, 1.0);
+
+    let out_a = ta + ba * (1.0 - ta);
+
+    if out_a <= 0.0 {
+        return RGBA::from_u8(0, 0, 0, 0.0);
+    }
+
+    let out_r = ((top.r as f32 / 255.0) * ta + (bottom.r as f32 / 255.0) * ba * (1.0 - ta)) / out_a;
+    let out_g = ((top.g as f32 / 255.0) * ta + (bottom.g as f32 / 255.0) * ba * (1.0 - ta)) / out_a;
+    let out_b = ((top.b as f32 / 255.0) * ta + (bottom.b as f32 / 255.0) * ba * (1.0 - ta)) / out_a;
+
+    RGBA::from_f32(out_r, out_g, out_b, out_a)
 }

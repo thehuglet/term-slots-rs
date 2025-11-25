@@ -7,14 +7,10 @@ use crossterm::{
     cursor,
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseEventKind},
     execute, queue,
-    style::{
-        self, Attributes, Color, ContentStyle, Print, ResetColor, SetBackgroundColor, SetStyle,
-    },
-    terminal::{self, ClearType},
+    style::{Attributes, Color, ContentStyle, Print, ResetColor, SetStyle},
+    terminal::{self},
 };
-use rand::Rng;
 use std::{
-    cmp::max,
     io::{self, Stdout, Write},
     time,
 };
@@ -27,7 +23,7 @@ use crate::{
 };
 
 /// Return `Result<false>` is as program exit signal.
-fn tick(ctx: &mut Context, dt: f64, stdout: &mut Stdout) -> io::Result<bool> {
+fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<bool> {
     // Dirty inline input handling for now
     if event::poll(time::Duration::from_millis(0))? {
         match event::read()? {
@@ -41,23 +37,14 @@ fn tick(ctx: &mut Context, dt: f64, stdout: &mut Stdout) -> io::Result<bool> {
                     ctx.mouse_pos = (mouse_event.column, mouse_event.row);
                 }
             }
+            Event::Resize(w, h) => {
+                // Recreate screen on resize to avoid graphical anomalies
+                ctx.screen = Screen::new(w as usize, h as usize, RGBA::from_u8(0, 0, 0, 1.0))
+            }
             _ => {}
         }
     }
-    // FPS counter test
-    ctx.fps_counter.update(dt);
-    // let fps_text = format!("FPS: {:.2}", ctx.fps_counter.fps());
-    // queue!(stdout, cursor::MoveTo(0, 0), Print(fps_text))?;
 
-    fill_screen_background(
-        &mut ctx.screen.new_buffer,
-        RGBA {
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 1.0,
-        },
-    );
     let mut draw_calls: Vec<DrawCall> = vec![];
 
     // Experiment
@@ -70,7 +57,7 @@ fn tick(ctx: &mut Context, dt: f64, stdout: &mut Stdout) -> io::Result<bool> {
     draw_calls.push(DrawCall {
         x: 0,
         y: 0,
-        text: RichText::new(format!("FPS: {:.2}", ctx.fps_counter.fps())),
+        text: RichText::new(format!("FPS: {:2.2}", ctx.fps_counter.fps())),
     });
 
     compose_buffer(&mut ctx.screen.new_buffer, &draw_calls);
@@ -101,7 +88,8 @@ fn tick(ctx: &mut Context, dt: f64, stdout: &mut Stdout) -> io::Result<bool> {
             stdout,
             cursor::MoveTo(x as u16, y as u16),
             SetStyle(style),
-            Print(cell.ch)
+            Print(cell.ch),
+            ResetColor,
         )?;
     }
 
@@ -140,9 +128,12 @@ fn main() -> io::Result<()> {
     'game_loop: loop {
         let dt: f64 = fps_limiter.wait();
 
-        if !tick(&mut ctx, dt, &mut stdout)? {
+        if !tick(&mut ctx, &mut stdout)? {
             break 'game_loop;
         }
+
+        ctx.fps_counter.update(dt);
+        ctx.game_time += dt;
     }
 
     execute!(
