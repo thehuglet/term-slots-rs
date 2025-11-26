@@ -125,6 +125,17 @@ pub struct DrawCall {
     pub text: RichText,
 }
 
+pub fn point_in_rect(
+    x: usize,
+    y: usize,
+    rect_x1: usize,
+    rect_y1: usize,
+    rect_x2: usize,
+    rect_y2: usize,
+) -> bool {
+    x >= rect_x1 && x <= rect_x2 && y >= rect_y1 && y <= rect_y2
+}
+
 pub fn diff_buffers<'a>(
     old: &'a ScreenBuffer,
     new: &'a ScreenBuffer,

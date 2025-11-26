@@ -1,7 +1,10 @@
+mod button;
 mod constants;
 mod context;
 mod fps_counter;
 mod fps_limiter;
+mod game_state;
+mod input;
 mod playing_card;
 mod renderer;
 
@@ -14,13 +17,15 @@ use crossterm::{
 };
 use std::{
     io::{self, Stdout, Write},
-    time,
+    time::{self, Duration},
 };
 
 use crate::{
+    button::{Button, draw_button},
     context::Context,
     fps_counter::FPSCounter,
     fps_limiter::FPSLimiter,
+    input::{Action, ProgramStatus, resolve_action, to_action},
     playing_card::{PlayingCard, Rank, Suit, draw_playing_card_big, draw_playing_card_small},
     renderer::{
         Cell, DrawCall, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
@@ -29,27 +34,25 @@ use crate::{
 };
 
 /// Return `Result<false>` is as program exit signal.
-fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<bool> {
-    // Dirty inline input handling for now
-    if event::poll(time::Duration::from_millis(0))? {
-        match event::read()? {
-            Event::Key(key_event) => {
-                if key_event.code == KeyCode::Esc || key_event.code == KeyCode::Char('q') {
-                    return Ok(false);
-                }
-            }
-            Event::Mouse(mouse_event) => {
-                if mouse_event.kind == MouseEventKind::Moved {
-                    ctx.mouse_pos = (mouse_event.column, mouse_event.row);
-                }
-            }
-            Event::Resize(w, h) => {
-                // Recreate screen on resize to avoid graphical anomalies
-                ctx.screen = Screen::new(w as usize, h as usize, RGBA::from_u8(0, 0, 0, 1.0))
-            }
-            _ => {}
-        }
-    }
+fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
+    // Button definitions
+    let mut buttons: Vec<Button> = vec![];
+
+    buttons.push(Button {
+        x: 10,
+        y: 10,
+        text: "Exit",
+        action: Action::ExitGame,
+        color: RGBA::from_f32(0.8, 0.8, 0.8, 1.0),
+    });
+
+    let program_status: ProgramStatus = if event::poll(Duration::from_millis(0))? {
+        let action: Option<Action> = to_action(ctx, event::read()?, &buttons);
+
+        resolve_action(ctx, action)
+    } else {
+        ProgramStatus::Running
+    };
 
     fill_screen_background(&mut ctx.screen.new_buffer, RGBA::from_u8(0, 0, 0, 1.0));
     let mut draw_queue: Vec<DrawCall> = vec![];
@@ -66,14 +69,24 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<bool> {
         );
     }
 
+    // Pushbutton experiment
+    for button in buttons {
+        draw_button(
+            &mut draw_queue,
+            &button,
+            ctx.mouse_pos.0 as usize,
+            ctx.mouse_pos.1 as usize,
+        )
+    }
+
     // Experiment
-    draw_queue.push(DrawCall {
-        x: ctx.mouse_pos.0.saturating_sub(2) as usize,
-        y: ctx.mouse_pos.1.saturating_sub(6) as usize,
-        text: RichText::new("Boop!")
-            .with_fg(RGBA::from_f32(1.0, 0.0, 0.0, 1.0))
-            .with_bold(true),
-    });
+    // draw_queue.push(DrawCall {
+    //     x: ctx.mouse_pos.0.saturating_sub(2) as usize,
+    //     y: ctx.mouse_pos.1.saturating_sub(6) as usize,
+    //     text: RichText::new("Boop!")
+    //         .with_fg(RGBA::from_f32(1.0, 0.0, 0.0, 1.0))
+    //         .with_bold(true),
+    // });
 
     draw_queue.push(DrawCall {
         x: 0,
@@ -99,7 +112,7 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<bool> {
 
     stdout.flush()?;
     ctx.screen.swap_buffers();
-    Ok(true)
+    Ok(program_status)
 }
 
 fn main() -> io::Result<()> {
@@ -127,12 +140,12 @@ fn main() -> io::Result<()> {
         fps_counter: FPSCounter::new(0.08),
     };
 
-    let mut fps_limiter = FPSLimiter::new(0.0, 0.001, 0.002);
+    let mut fps_limiter = FPSLimiter::new(144.0, 0.001, 0.002);
 
     'game_loop: loop {
         let dt: f64 = fps_limiter.wait();
 
-        if !tick(&mut ctx, &mut stdout)? {
+        if tick(&mut ctx, &mut stdout)? == ProgramStatus::Exit {
             break 'game_loop;
         }
 
@@ -140,13 +153,13 @@ fn main() -> io::Result<()> {
         ctx.game_time += dt;
     }
 
+    terminal::disable_raw_mode()?;
     execute!(
         stdout,
         terminal::LeaveAlternateScreen,
         cursor::Show,
         DisableMouseCapture
     )?;
-    terminal::disable_raw_mode()?;
 
     Ok(())
 }
