@@ -161,6 +161,34 @@ pub fn diff_buffers<'a>(
     diffs
 }
 
+fn rgb_u8_to_hsv(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
+    let rf = r as f32 / 255.0;
+    let gf = g as f32 / 255.0;
+    let bf = b as f32 / 255.0;
+
+    let max = rf.max(gf.max(bf));
+    let min = rf.min(gf.min(bf));
+    let d = max - min;
+
+    // Hue
+    let hue = if d == 0.0 {
+        0.0
+    } else if max == rf {
+        60.0 * (((gf - bf) / d).rem_euclid(6.0))
+    } else if max == gf {
+        60.0 * (((bf - rf) / d) + 2.0)
+    } else {
+        60.0 * (((rf - gf) / d) + 4.0)
+    };
+
+    let saturation = if max == 0.0 { 0.0 } else { d / max };
+
+    // Value
+    let v = max;
+
+    (hue, saturation, v)
+}
+
 pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
     for dc in draw_calls {
         let mut px: usize = dc.x;
@@ -181,7 +209,9 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
             let preserve_old_bg: bool = new_seg.bg.a == 0.0;
 
             if skip_fg_blending {
-                cell.fg = new_seg.fg
+                if new_seg_ch != ' ' {
+                    cell.fg = new_seg.fg
+                }
             } else {
                 // Blending with fg when the char is missing results in a more natural transition for certain effects,
                 // especially useful for pop-up text as going from alpha 0.0 -> old cell will look more natural
@@ -196,7 +226,10 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                 cell.fg = blend_source_over(&bottom_col, &new_seg.fg);
             }
 
-            cell.ch = new_seg_ch;
+            if new_seg_ch != ' ' {
+                cell.ch = new_seg_ch;
+            }
+
             cell.bold = new_seg.bold;
 
             if skip_bg_blending {
@@ -295,4 +328,18 @@ pub fn lerp_rgba(a: &RGBA, b: &RGBA, t: f32) -> RGBA {
         a.b as f32 / 255.0 * (1.0 - t) + b.b as f32 / 255.0 * t,
         a.a * (1.0 - t) + b.a * t,
     )
+}
+
+pub fn brightness(col: RGBA, factor: f32) -> RGBA {
+    let scale = |v: u8| -> u8 {
+        let x = (v as f32 * factor).round();
+        x.clamp(0.0, 255.0) as u8
+    };
+
+    RGBA {
+        r: scale(col.r),
+        g: scale(col.g),
+        b: scale(col.b),
+        a: col.a,
+    }
 }

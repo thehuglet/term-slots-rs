@@ -29,11 +29,10 @@ use crate::{
     playing_card::{PlayingCard, Rank, Suit, draw_playing_card_big, draw_playing_card_small},
     renderer::{
         Cell, DrawCall, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
-        diff_buffers, fill_screen_background,
+        diff_buffers, draw_rect, fill_screen_background,
     },
 };
 
-/// Return `Result<false>` is as program exit signal.
 fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     // Button definitions
     let mut buttons: Vec<Button> = vec![];
@@ -43,7 +42,7 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
         y: 10,
         text: "Exit",
         action: Action::ExitGame,
-        color: RGBA::from_f32(0.8, 0.8, 0.8, 1.0),
+        color: RGBA::from_u8(255, 151, 0, 1.0),
     });
 
     let program_status: ProgramStatus = if event::poll(Duration::from_millis(0))? {
@@ -58,16 +57,44 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     let mut draw_queue: Vec<DrawCall> = vec![];
 
     for n in 0..10 {
-        draw_playing_card_small(
+        draw_playing_card_big(
             &mut draw_queue,
             5 + n * 4,
             5,
             &PlayingCard {
-                suit: Suit::Spade,
+                suit: Suit::Club,
                 rank: Rank::King,
             },
         );
     }
+
+    let sinewave = 0.5 + 0.5 * (10.0 * ctx.game_time).sin() as f32;
+
+    draw_queue.push(DrawCall {
+        x: ctx.mouse_pos.0 as usize,
+        y: ctx.mouse_pos.1 as usize,
+        text: RichText::new("Hello, World!")
+            .with_fg(RGBA::from_f32(1.0, 0.0, 0.0, sinewave))
+            .with_bold(true),
+    });
+
+    draw_rect(
+        &mut draw_queue,
+        12,
+        15,
+        15,
+        5,
+        RGBA::from_f32(1.0, 0.0, 0.0, 0.5),
+    );
+
+    draw_rect(
+        &mut draw_queue,
+        15,
+        12,
+        15,
+        5,
+        RGBA::from_f32(0.0, 0.0, 1.0, 0.5),
+    );
 
     // Pushbutton experiment
     for button in buttons {
@@ -140,7 +167,7 @@ fn main() -> io::Result<()> {
         fps_counter: FPSCounter::new(0.08),
     };
 
-    let mut fps_limiter = FPSLimiter::new(144.0, 0.001, 0.002);
+    let mut fps_limiter = FPSLimiter::new(0.0, 0.001, 0.002);
 
     'game_loop: loop {
         let dt: f64 = fps_limiter.wait();

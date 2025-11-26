@@ -1,6 +1,6 @@
 use crate::{
     input::Action,
-    renderer::{DrawCall, RGBA, RichText, draw_rect, point_in_rect},
+    renderer::{DrawCall, RGBA, RichText, brightness, draw_rect, point_in_rect},
 };
 
 pub struct Button {
@@ -25,9 +25,9 @@ pub fn draw_button(
     let is_hovering = point_in_rect(mouse_x, mouse_y, button.x, button.y, button_x2, button_y2);
 
     let bg_color = if is_hovering {
-        RGBA::from_f32(0.9, 0.9, 0.9, 1.0) // highlighted
+        brightness(button.color, 1.5)
     } else {
-        RGBA::from_f32(0.6, 0.6, 0.6, 1.0) // normal
+        button.color
     };
 
     draw_rect(draw_queue, button.x, button.y, w, h, bg_color);
