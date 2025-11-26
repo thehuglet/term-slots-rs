@@ -1,6 +1,6 @@
 use crate::{
     constants::{COLOR_BLACK, COLOR_RED, DEFAULT_CARD_BG_COLOR},
-    renderer::{DrawCall, RGBA, RichText},
+    renderer::{DrawCall, RGBA, RichText, ScreenBuffer},
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -73,13 +73,39 @@ pub struct PlayingCard {
     pub rank: Rank,
 }
 
-pub fn draw_playing_card_big(x: usize, y: usize, card: &PlayingCard) -> Vec<DrawCall> {
-    let mut draw_calls = Vec::new();
+pub fn draw_playing_card_small(
+    draw_queue: &mut Vec<DrawCall>,
+    x: usize,
+    y: usize,
+    card: &PlayingCard,
+) {
+    let suit_repr: &'static str = card.suit.repr();
+    let rank_repr: &'static str = card.rank.repr();
+    let suit_color: RGBA = card.suit.color();
+    let bg_color: RGBA = DEFAULT_CARD_BG_COLOR;
 
-    let suit_str = card.suit.repr();
-    let rank_str = card.rank.repr();
-    let suit_color = card.suit.color();
-    let bg_color = DEFAULT_CARD_BG_COLOR;
+    let text: String = format!("{suit}{rank:>2}", suit = suit_repr, rank = rank_repr);
+
+    draw_queue.push(DrawCall {
+        x: x,
+        y: y,
+        text: RichText::new(text)
+            .with_fg(suit_color)
+            .with_bg(bg_color)
+            .with_bold(true),
+    });
+}
+
+pub fn draw_playing_card_big(
+    draw_queue: &mut Vec<DrawCall>,
+    x: usize,
+    y: usize,
+    card: &PlayingCard,
+) {
+    let suit_repr: &'static str = card.suit.repr();
+    let rank_repr: &'static str = card.rank.repr();
+    let suit_color: RGBA = card.suit.color();
+    let bg_color: RGBA = DEFAULT_CARD_BG_COLOR;
 
     // Choose pattern based on rank
     let pattern: [&str; 3] = match card.rank {
@@ -106,21 +132,19 @@ pub fn draw_playing_card_big(x: usize, y: usize, card: &PlayingCard) -> Vec<Draw
     for (row_index, pattern_row) in pattern.iter().enumerate() {
         let mut text_row = pattern_row.to_string();
 
-        text_row = text_row.replace("<<", &format!("{:<2}", rank_str));
-        text_row = text_row.replace(">>", &format!("{:>2}", rank_str));
-        text_row = text_row.replace("S", suit_str);
+        text_row = text_row.replace("<<", &format!("{:<2}", rank_repr));
+        text_row = text_row.replace(">>", &format!("{:>2}", rank_repr));
+        text_row = text_row.replace("S", suit_repr);
 
         let rich_text = RichText::new(text_row)
             .with_fg(suit_color)
             .with_bg(bg_color)
             .with_bold(true);
 
-        draw_calls.push(DrawCall {
-            x,
+        draw_queue.push(DrawCall {
+            x: x,
             y: y + row_index,
             text: rich_text,
         });
     }
-
-    draw_calls
 }

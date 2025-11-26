@@ -9,24 +9,28 @@ pub struct FPSLimiter {
 }
 
 impl FPSLimiter {
-    pub fn new(fps: f64, poll_interval: f64, spin_reserve: f64) -> Self {
-        let target = if fps <= 0.0 {
-            Duration::ZERO // uncapped
+    pub fn new(fps: f64, poll_interval_sec: f64, spin_reserve_sec: f64) -> Self {
+        let fps_is_uncapped: bool = fps <= 0.0;
+
+        let target = if fps_is_uncapped {
+            Duration::ZERO
         } else {
             Duration::from_secs_f64(1.0 / fps)
         };
+
         let now = Instant::now();
+
         Self {
             target,
             next_frame: now + target,
-            poll_interval: Duration::from_secs_f64(poll_interval),
-            spin_reserve: Duration::from_secs_f64(spin_reserve),
+            poll_interval: Duration::from_secs_f64(poll_interval_sec),
+            spin_reserve: Duration::from_secs_f64(spin_reserve_sec),
         }
     }
 
     pub fn wait(&mut self) -> f64 {
         if self.target == Duration::ZERO {
-            // uncapped → just return delta since last call
+            // Uncapped -> Return delta since last call
             let now = Instant::now();
             let dt = now
                 .duration_since(self.next_frame - self.target)
