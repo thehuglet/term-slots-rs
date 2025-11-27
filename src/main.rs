@@ -7,6 +7,7 @@ mod game_state;
 mod input;
 mod playing_card;
 mod renderer;
+mod slots;
 
 use crossterm::{
     cursor,
@@ -22,107 +23,50 @@ use std::{
 
 use crate::{
     button::{Button, draw_button},
-    context::Context,
-    fps_counter::FPSCounter,
+    context::{Context, MouseContext},
+    fps_counter::{FPSCounter, draw_fps_counter},
     fps_limiter::FPSLimiter,
-    input::{Action, ProgramStatus, resolve_action, to_action},
+    input::{ProgramStatus, resolve_input},
     playing_card::{PlayingCard, Rank, Suit, draw_playing_card_big, draw_playing_card_small},
     renderer::{
-        Cell, DrawCall, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
+        Cell, DrawCall, HSL, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
         diff_buffers, draw_rect, fill_screen_background,
     },
+    slots::{Column, Slots, draw_slots},
 };
 
 fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
-    // Button definitions
+    // --- Button definitions ---
     let mut buttons: Vec<Button> = vec![];
 
     buttons.push(Button {
-        x: 10,
+        x: 50,
         y: 10,
-        text: "Exit",
-        action: Action::ExitGame,
+        text: "SPIN",
         color: RGBA::from_u8(255, 151, 0, 1.0),
+        disabled: false,
     });
 
+    // --- Inputs ---
     let program_status: ProgramStatus = if event::poll(Duration::from_millis(0))? {
-        let action: Option<Action> = to_action(ctx, event::read()?, &buttons);
-
-        resolve_action(ctx, action)
+        resolve_input(ctx, event::read()?, &buttons)
     } else {
         ProgramStatus::Running
     };
 
+    // --- Rendering ---
     fill_screen_background(&mut ctx.screen.new_buffer, RGBA::from_u8(0, 0, 0, 1.0));
     let mut draw_queue: Vec<DrawCall> = vec![];
 
-    for n in 0..10 {
-        draw_playing_card_big(
-            &mut draw_queue,
-            5 + n * 4,
-            5,
-            &PlayingCard {
-                suit: Suit::Club,
-                rank: Rank::King,
-            },
-        );
-    }
+    draw_slots(&mut draw_queue, 13, 6);
 
-    let sinewave = 0.5 + 0.5 * (10.0 * ctx.game_time).sin() as f32;
-
-    draw_queue.push(DrawCall {
-        x: ctx.mouse_pos.0 as usize,
-        y: ctx.mouse_pos.1 as usize,
-        text: RichText::new("Hello, World!")
-            .with_fg(RGBA::from_f32(1.0, 0.0, 0.0, sinewave))
-            .with_bold(true),
-    });
-
-    draw_rect(
-        &mut draw_queue,
-        12,
-        15,
-        15,
-        5,
-        RGBA::from_f32(1.0, 0.0, 0.0, 0.5),
-    );
-
-    draw_rect(
-        &mut draw_queue,
-        15,
-        12,
-        15,
-        5,
-        RGBA::from_f32(0.0, 0.0, 1.0, 0.5),
-    );
-
-    // Pushbutton experiment
     for button in buttons {
-        draw_button(
-            &mut draw_queue,
-            &button,
-            ctx.mouse_pos.0 as usize,
-            ctx.mouse_pos.1 as usize,
-        )
+        draw_button(&mut draw_queue, &button, &ctx.mouse)
     }
 
-    // Experiment
-    // draw_queue.push(DrawCall {
-    //     x: ctx.mouse_pos.0.saturating_sub(2) as usize,
-    //     y: ctx.mouse_pos.1.saturating_sub(6) as usize,
-    //     text: RichText::new("Boop!")
-    //         .with_fg(RGBA::from_f32(1.0, 0.0, 0.0, 1.0))
-    //         .with_bold(true),
-    // });
+    draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
 
-    draw_queue.push(DrawCall {
-        x: 0,
-        y: 0,
-        text: RichText::new(format!("FPS: {:2.2}", ctx.fps_counter.fps())),
-    });
-
-    // --- Rendering boilerplate ---
-
+    // --- Renderer boilerplate ---
     compose_buffer(&mut ctx.screen.new_buffer, &draw_queue);
     let diff: Vec<(usize, usize, &Cell)> =
         diff_buffers(&ctx.screen.old_buffer, &ctx.screen.new_buffer);
@@ -145,6 +89,10 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
 fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
 
+    let full_deck: Vec<PlayingCard> = Suit::iter()
+        .flat_map(|suit| Rank::iter().map(move |rank| PlayingCard { suit, rank }))
+        .collect();
+
     terminal::enable_raw_mode()?;
     execute!(
         stdout,
@@ -154,16 +102,29 @@ fn main() -> io::Result<()> {
         EnableMouseCapture
     )?;
 
-    let term_size: (u16, u16) = terminal::size()?;
+    let (width, height) = terminal::size()?;
 
     let mut ctx = Context {
-        screen: Screen::new(
-            term_size.0 as usize,
-            term_size.1 as usize,
-            RGBA::from_u8(0, 0, 0, 1.0),
-        ),
-        mouse_pos: (0, 0),
+        screen: Screen::new(width, height, RGBA::from_u8(0, 0, 0, 1.0)),
+        mouse: MouseContext {
+            x: 0,
+            y: 0,
+            is_down: false,
+        },
         game_time: 0.0,
+        slots: Slots {
+            spin_count: 0,
+            columns: vec![
+                Column {
+                    cursor: 0.0,
+                    cards: full_deck.clone(),
+                    spin_duration: 0.0,
+                    spin_time_remaining: 0.0,
+                    spin_speed: 0.0,
+                };
+                3
+            ],
+        },
         fps_counter: FPSCounter::new(0.08),
     };
 

@@ -1,9 +1,9 @@
 use crate::{
     constants::{COLOR_BLACK, COLOR_RED, DEFAULT_CARD_BG_COLOR},
-    renderer::{DrawCall, RGBA, RichText, ScreenBuffer},
+    renderer::{DrawCall, RGBA, RichText},
 };
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Suit {
     Spade,
     Heart,
@@ -29,9 +29,13 @@ impl Suit {
             Suit::Diamond => COLOR_RED,
         }
     }
+
+    pub fn iter() -> std::array::IntoIter<Suit, 4> {
+        [Suit::Spade, Suit::Heart, Suit::Club, Suit::Diamond].into_iter()
+    }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Rank {
     Ace,
     King,
@@ -66,19 +70,34 @@ impl Rank {
             Rank::Num2 => "2",
         }
     }
+
+    pub fn iter() -> std::array::IntoIter<Rank, 13> {
+        [
+            Rank::Ace,
+            Rank::King,
+            Rank::Queen,
+            Rank::Jack,
+            Rank::Num10,
+            Rank::Num9,
+            Rank::Num8,
+            Rank::Num7,
+            Rank::Num6,
+            Rank::Num5,
+            Rank::Num4,
+            Rank::Num3,
+            Rank::Num2,
+        ]
+        .into_iter()
+    }
 }
 
+#[derive(Clone)]
 pub struct PlayingCard {
     pub suit: Suit,
     pub rank: Rank,
 }
 
-pub fn draw_playing_card_small(
-    draw_queue: &mut Vec<DrawCall>,
-    x: usize,
-    y: usize,
-    card: &PlayingCard,
-) {
+pub fn draw_playing_card_small(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, card: &PlayingCard) {
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
     let suit_color: RGBA = card.suit.color();
@@ -89,19 +108,14 @@ pub fn draw_playing_card_small(
     draw_queue.push(DrawCall {
         x: x,
         y: y,
-        text: RichText::new(text)
+        rich_text: RichText::new(text)
             .with_fg(suit_color)
             .with_bg(bg_color)
             .with_bold(true),
     });
 }
 
-pub fn draw_playing_card_big(
-    draw_queue: &mut Vec<DrawCall>,
-    x: usize,
-    y: usize,
-    card: &PlayingCard,
-) {
+pub fn draw_playing_card_big(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, card: &PlayingCard) {
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
     let suit_color: RGBA = card.suit.color();
@@ -143,8 +157,8 @@ pub fn draw_playing_card_big(
 
         draw_queue.push(DrawCall {
             x: x,
-            y: y + row_index,
-            text: rich_text,
+            y: y + row_index as u16,
+            rich_text,
         });
     }
 }

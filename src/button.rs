@@ -1,42 +1,55 @@
 use crate::{
-    input::Action,
-    renderer::{DrawCall, RGBA, RichText, brightness, draw_rect, point_in_rect},
+    context::MouseContext,
+    renderer::{DrawCall, HSL, RGBA, RichText, draw_rect, point_in_rect},
 };
 
 pub struct Button {
-    pub x: usize,
-    pub y: usize,
+    pub x: u16,
+    pub y: u16,
     pub text: &'static str,
-    pub action: Action,
+    // pub action: Action,
     pub color: RGBA,
+    pub disabled: bool,
 }
 
-pub fn draw_button(
-    draw_queue: &mut Vec<DrawCall>,
-    button: &Button,
-    mouse_x: usize,
-    mouse_y: usize,
-) {
-    let w: usize = button.text.len() + 2;
-    let h: usize = 1;
-    let button_x2 = button.x + w - 1;
-    let button_y2 = button.y + h - 1;
+pub fn draw_button(draw_queue: &mut Vec<DrawCall>, button: &Button, mouse: &MouseContext) {
+    let w: u16 = (button.text.len() + 2) as u16;
+    let h: u16 = 1;
 
-    let is_hovering = point_in_rect(mouse_x, mouse_y, button.x, button.y, button_x2, button_y2);
-
-    let bg_color = if is_hovering {
-        brightness(button.color, 1.5)
-    } else {
-        button.color
-    };
-
-    draw_rect(draw_queue, button.x, button.y, w, h, bg_color);
-
+    draw_rect(
+        draw_queue,
+        button.x,
+        button.y,
+        w,
+        h,
+        button_bg(&button, &mouse),
+    );
     draw_queue.push(DrawCall {
         x: button.x + 1,
         y: button.y,
-        text: RichText::new(button.text)
+        rich_text: RichText::new(button.text)
             .with_fg(RGBA::from_f32(0.0, 0.0, 0.0, 1.0))
             .with_bold(true),
     })
+}
+
+fn button_bg(button: &Button, mouse: &MouseContext) -> RGBA {
+    let w: u16 = (button.text.len() + 2) as u16;
+    let h: u16 = 1;
+    let button_x2: u16 = button.x + w - 1;
+    let button_y2: u16 = button.y + h - 1;
+
+    let mut hsl = HSL::from_rgba(button.color);
+
+    let is_hovered: bool =
+        point_in_rect(mouse.x, mouse.y, button.x, button.y, button_x2, button_y2);
+    let is_pressed: bool = is_hovered && mouse.is_down;
+
+    if button.disabled || is_pressed {
+        hsl.l *= 0.5;
+    } else if is_hovered {
+        hsl.l *= 1.35;
+    }
+
+    RGBA::from_hsl(hsl)
 }

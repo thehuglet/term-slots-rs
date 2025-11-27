@@ -1,3 +1,5 @@
+use crate::renderer::{DrawCall, RichText};
+
 pub struct FPSCounter {
     ema: f64,
     alpha: f64,
@@ -23,4 +25,12 @@ impl FPSCounter {
     pub fn fps(&self) -> f64 {
         self.ema
     }
+}
+
+pub fn draw_fps_counter(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, fps_counter: &FPSCounter) {
+    draw_queue.push(DrawCall {
+        x: x,
+        y: y,
+        rich_text: RichText::new(format!("FPS: {:2.0}", fps_counter.fps())),
+    });
 }

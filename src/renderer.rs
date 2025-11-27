@@ -26,6 +26,86 @@ impl RGBA {
             a: a.clamp(0.0, 1.0),
         }
     }
+
+    pub fn from_hsl(hsl: HSL) -> Self {
+        let HSL { h, s, l, a } = hsl;
+
+        let chroma = (1.0 - (2.0 * l - 1.0).abs()) * s;
+        let hue_sector = h / 60.0;
+        let x = chroma * (1.0 - (hue_sector % 2.0 - 1.0).abs());
+        let lightness_adjustment = l - chroma / 2.0;
+
+        let (red_component, green_component, blue_component) = match hue_sector {
+            h if h >= 0.0 && h < 1.0 => (chroma, x, 0.0),
+            h if h >= 1.0 && h < 2.0 => (x, chroma, 0.0),
+            h if h >= 2.0 && h < 3.0 => (0.0, chroma, x),
+            h if h >= 3.0 && h < 4.0 => (0.0, x, chroma),
+            h if h >= 4.0 && h < 5.0 => (x, 0.0, chroma),
+            h if h >= 5.0 && h < 6.0 => (chroma, 0.0, x),
+            _ => (0.0, 0.0, 0.0), // fallback for invalid hue
+        };
+
+        RGBA {
+            r: ((red_component + lightness_adjustment) * 255.0).round() as u8,
+            g: ((green_component + lightness_adjustment) * 255.0).round() as u8,
+            b: ((blue_component + lightness_adjustment) * 255.0).round() as u8,
+            a, // Preserve alpha
+        }
+    }
+}
+
+/// Only use this for intermediate math, convert back to RGBA after you're done.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HSL {
+    pub h: f32,
+    pub s: f32,
+    pub l: f32,
+    // Preserves alpha channel when converting from RGBA
+    a: f32,
+}
+
+impl HSL {
+    pub fn from_rgba(rgba: RGBA) -> Self {
+        let RGBA { r, g, b, a } = rgba;
+
+        let red = r as f32 / 255.0;
+        let green = g as f32 / 255.0;
+        let blue = b as f32 / 255.0;
+
+        let max_component = red.max(green.max(blue));
+        let min_component = red.min(green.min(blue));
+        let delta = max_component - min_component;
+
+        // Calculate lightness
+        let lightness = (max_component + min_component) / 2.0;
+
+        // Calculate hue
+        let hue = if delta == 0.0 {
+            0.0
+        } else if max_component == red {
+            60.0 * (((green - blue) / delta) % 6.0)
+        } else if max_component == green {
+            60.0 * (((blue - red) / delta) + 2.0)
+        } else {
+            60.0 * (((red - green) / delta) + 4.0)
+        };
+
+        let normalized_hue = if hue < 0.0 { hue + 360.0 } else { hue };
+
+        // Calculate saturation
+        let saturation = if delta == 0.0 {
+            0.0
+        } else {
+            delta / (1.0 - (2.0 * lightness - 1.0).abs())
+        };
+
+        HSL {
+            h: normalized_hue,
+            s: saturation,
+            l: lightness,
+            a, // Preserve alpha
+        }
+    }
 }
 
 pub struct RichText {
@@ -80,13 +160,13 @@ pub struct Cell {
 }
 
 pub struct ScreenBuffer {
-    width: usize,
-    height: usize,
+    width: u16,
+    height: u16,
     cells: Vec<Cell>,
 }
 
 impl ScreenBuffer {
-    fn new(width: usize, height: usize, default_bg: RGBA) -> Self {
+    fn new(width: u16, height: u16, default_bg: RGBA) -> Self {
         let cell = Cell {
             ch: ' ',
             fg: RGBA::from_u8(255, 255, 255, 1.0),
@@ -96,7 +176,7 @@ impl ScreenBuffer {
         Self {
             width,
             height,
-            cells: vec![cell; width * height],
+            cells: vec![cell; width as usize * height as usize],
         }
     }
 }
@@ -107,7 +187,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(width: usize, height: usize, default_bg: RGBA) -> Self {
+    pub fn new(width: u16, height: u16, default_bg: RGBA) -> Self {
         Self {
             old_buffer: ScreenBuffer::new(width, height, default_bg),
             new_buffer: ScreenBuffer::new(width, height, default_bg),
@@ -120,18 +200,18 @@ impl Screen {
 }
 
 pub struct DrawCall {
-    pub x: usize,
-    pub y: usize,
-    pub text: RichText,
+    pub x: u16,
+    pub y: u16,
+    pub rich_text: RichText,
 }
 
 pub fn point_in_rect(
-    x: usize,
-    y: usize,
-    rect_x1: usize,
-    rect_y1: usize,
-    rect_x2: usize,
-    rect_y2: usize,
+    x: u16,
+    y: u16,
+    rect_x1: u16,
+    rect_y1: u16,
+    rect_x2: u16,
+    rect_y2: u16,
 ) -> bool {
     x >= rect_x1 && x <= rect_x2 && y >= rect_y1 && y <= rect_y2
 }
@@ -141,13 +221,13 @@ pub fn diff_buffers<'a>(
     new: &'a ScreenBuffer,
 ) -> Vec<(usize, usize, &'a Cell)> {
     let mut diffs = Vec::new();
-    let h = old.height.min(new.height);
-    let w = old.width.min(new.width);
+    let h: usize = old.height.min(new.height) as usize;
+    let w: usize = old.width.min(new.width) as usize;
 
     for y in 0..h {
         for x in 0..w {
-            let old_cell = &old.cells[y * old.width + x];
-            let new_cell = &new.cells[y * new.width + x];
+            let old_cell = &old.cells[y * old.width as usize + x];
+            let new_cell = &new.cells[y * new.width as usize + x];
             if old_cell.ch != new_cell.ch
                 || old_cell.fg != new_cell.fg
                 || old_cell.bg != new_cell.bg
@@ -161,86 +241,47 @@ pub fn diff_buffers<'a>(
     diffs
 }
 
-fn rgb_u8_to_hsv(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
-    let rf = r as f32 / 255.0;
-    let gf = g as f32 / 255.0;
-    let bf = b as f32 / 255.0;
-
-    let max = rf.max(gf.max(bf));
-    let min = rf.min(gf.min(bf));
-    let d = max - min;
-
-    // Hue
-    let hue = if d == 0.0 {
-        0.0
-    } else if max == rf {
-        60.0 * (((gf - bf) / d).rem_euclid(6.0))
-    } else if max == gf {
-        60.0 * (((bf - rf) / d) + 2.0)
-    } else {
-        60.0 * (((rf - gf) / d) + 4.0)
-    };
-
-    let saturation = if max == 0.0 { 0.0 } else { d / max };
-
-    // Value
-    let v = max;
-
-    (hue, saturation, v)
-}
-
 pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
     for dc in draw_calls {
-        let mut px: usize = dc.x;
-        let y: usize = dc.y;
+        let mut x: u16 = dc.x;
+        let y: u16 = dc.y;
 
-        let new_seg: &RichText = &dc.text;
-
-        for new_seg_ch in new_seg.text.chars() {
-            if px >= buf.width || y >= buf.height {
+        for new_char in dc.rich_text.text.chars() {
+            if x >= buf.width || y >= buf.height {
                 break;
             }
 
-            let cell: &mut Cell = &mut buf.cells[y * buf.width + px];
+            let cell: &mut Cell = &mut buf.cells[(y * buf.width + x) as usize];
+            let new_rich_text: &RichText = &dc.rich_text;
 
-            let skip_fg_blending: bool = new_seg_ch == ' ' || new_seg.fg.a == 1.0;
-            let skip_bg_blending: bool =
-                cell.bg.a == 0.0 || new_seg.bg.a == 1.0 || new_seg.bg.a == 0.0;
-            let preserve_old_bg: bool = new_seg.bg.a == 0.0;
+            let is_old_char_visible: bool = cell.ch != ' ' && cell.fg.a > 0.0;
+            let is_new_char_visible: bool = new_char != ' ' && new_rich_text.fg.a > 0.0;
+            let preserve_old_bg: bool = new_rich_text.bg.a == 0.0;
+            let skip_fg_blending: bool = dc.rich_text.fg.a == 1.0 || dc.rich_text.fg.a == 0.0;
+            let skip_bg_blending: bool = dc.rich_text.bg.a == 1.0 || dc.rich_text.bg.a == 0.0;
 
-            if skip_fg_blending {
-                if new_seg_ch != ' ' {
-                    cell.fg = new_seg.fg
-                }
-            } else {
-                // Blending with fg when the char is missing results in a more natural transition for certain effects,
-                // especially useful for pop-up text as going from alpha 0.0 -> old cell will look more natural
-                let bottom_col: RGBA;
+            if is_new_char_visible {
+                cell.ch = new_char;
+                cell.bold = new_rich_text.bold;
 
-                if cell.ch != ' ' {
-                    bottom_col = cell.fg;
+                if skip_fg_blending {
+                    cell.fg = new_rich_text.fg;
                 } else {
-                    bottom_col = cell.bg
+                    #[rustfmt::skip]
+                    let bottom_color: RGBA = if is_old_char_visible { cell.fg } else { cell.bg };
+                    cell.fg = blend_source_over(&bottom_color, &new_rich_text.fg);
                 }
-
-                cell.fg = blend_source_over(&bottom_col, &new_seg.fg);
             }
 
-            if new_seg_ch != ' ' {
-                cell.ch = new_seg_ch;
-            }
-
-            cell.bold = new_seg.bold;
-
-            if skip_bg_blending {
-                if !preserve_old_bg {
-                    cell.bg = new_seg.bg
+            if !preserve_old_bg {
+                if skip_bg_blending {
+                    cell.bg = new_rich_text.bg;
+                } else {
+                    cell.bg = blend_source_over(&cell.bg, &new_rich_text.bg)
                 }
-            } else {
-                cell.bg = blend_source_over(&cell.bg, &new_seg.bg);
             }
 
-            px += 1;
+            x += 1;
         }
     }
 }
@@ -255,19 +296,12 @@ pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: RGBA) {
 }
 
 /// Helper for drawing rectangles
-pub fn draw_rect(
-    draw_queue: &mut Vec<DrawCall>,
-    x: usize,
-    y: usize,
-    w: usize,
-    h: usize,
-    color: RGBA,
-) {
+pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, h: u16, color: RGBA) {
     for row in 0..h {
         draw_queue.push(DrawCall {
             x: x,
             y: y + row,
-            text: RichText::new(" ".repeat(w)).with_bg(color),
+            rich_text: RichText::new(" ".repeat(w as usize)).with_bg(color),
         })
     }
 }
@@ -328,18 +362,4 @@ pub fn lerp_rgba(a: &RGBA, b: &RGBA, t: f32) -> RGBA {
         a.b as f32 / 255.0 * (1.0 - t) + b.b as f32 / 255.0 * t,
         a.a * (1.0 - t) + b.a * t,
     )
-}
-
-pub fn brightness(col: RGBA, factor: f32) -> RGBA {
-    let scale = |v: u8| -> u8 {
-        let x = (v as f32 * factor).round();
-        x.clamp(0.0, 255.0) as u8
-    };
-
-    RGBA {
-        r: scale(col.r),
-        g: scale(col.g),
-        b: scale(col.b),
-        a: col.a,
-    }
 }
