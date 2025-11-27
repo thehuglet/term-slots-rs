@@ -61,7 +61,7 @@ pub struct HSL {
     pub s: f32,
     pub l: f32,
     // Preserves alpha channel when converting from RGBA
-    a: f32,
+    pub a: f32,
 }
 
 impl HSL {
@@ -109,10 +109,10 @@ impl HSL {
 }
 
 pub struct RichText {
-    text: String,
-    fg: RGBA,
-    bg: RGBA,
-    bold: bool,
+    pub text: String,
+    pub fg: RGBA,
+    pub bg: RGBA,
+    pub bold: bool,
 }
 
 impl RichText {
@@ -160,8 +160,8 @@ pub struct Cell {
 }
 
 pub struct ScreenBuffer {
-    width: u16,
-    height: u16,
+    pub width: u16,
+    pub height: u16,
     cells: Vec<Cell>,
 }
 

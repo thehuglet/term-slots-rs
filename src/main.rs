@@ -27,13 +27,31 @@ use crate::{
     fps_counter::{FPSCounter, draw_fps_counter},
     fps_limiter::FPSLimiter,
     input::{ProgramStatus, resolve_input},
-    playing_card::{PlayingCard, Rank, Suit, draw_playing_card_big, draw_playing_card_small},
+    playing_card::{
+        PlayingCard, Rank, Suit, draw_calls_playing_card_big, draw_calls_playing_card_small,
+    },
     renderer::{
         Cell, DrawCall, HSL, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
         diff_buffers, draw_rect, fill_screen_background,
     },
     slots::{Column, Slots, draw_slots},
 };
+
+fn plasma_shader(x: u16, y: u16, time: f32) -> RGBA {
+    let fx = x as f32 / 80.0;
+    let fy = y as f32 / 24.0;
+
+    let value =
+        ((fx + time).sin() + (fy + time * 0.7).cos() + ((fx + fy + time * 1.3).sin() * 2.0)).sin();
+
+    let hue = (value * 0.5 + 0.5) * 360.0;
+    RGBA::from_hsl(HSL {
+        h: hue,
+        s: 0.8,
+        l: 0.4,
+        a: 1.0,
+    })
+}
 
 fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     // --- Button definitions ---
@@ -58,7 +76,20 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     fill_screen_background(&mut ctx.screen.new_buffer, RGBA::from_u8(0, 0, 0, 1.0));
     let mut draw_queue: Vec<DrawCall> = vec![];
 
-    draw_slots(&mut draw_queue, 13, 6);
+    // --- PLASMA SHADER BACKGROUND ---
+    let (width, height) = (ctx.screen.new_buffer.width, ctx.screen.new_buffer.height);
+    for y in 0..height {
+        for x in 0..width {
+            let color = plasma_shader(x, y, ctx.game_time as f32);
+            draw_queue.push(DrawCall {
+                x,
+                y,
+                rich_text: RichText::new(" ").with_bg(color),
+            });
+        }
+    }
+
+    draw_slots(&mut draw_queue, 5, 5, &ctx.slots);
 
     for button in buttons {
         draw_button(&mut draw_queue, &button, &ctx.mouse)

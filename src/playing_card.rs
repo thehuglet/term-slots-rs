@@ -97,7 +97,7 @@ pub struct PlayingCard {
     pub rank: Rank,
 }
 
-pub fn draw_playing_card_small(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, card: &PlayingCard) {
+pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &PlayingCard) -> DrawCall {
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
     let suit_color: RGBA = card.suit.color();
@@ -105,17 +105,19 @@ pub fn draw_playing_card_small(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, c
 
     let text: String = format!("{suit}{rank:>2}", suit = suit_repr, rank = rank_repr);
 
-    draw_queue.push(DrawCall {
+    DrawCall {
         x: x,
         y: y,
         rich_text: RichText::new(text)
             .with_fg(suit_color)
             .with_bg(bg_color)
             .with_bold(true),
-    });
+    }
 }
 
-pub fn draw_playing_card_big(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, card: &PlayingCard) {
+pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<DrawCall> {
+    let mut draw_calls: Vec<DrawCall> = vec![];
+
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
     let suit_color: RGBA = card.suit.color();
@@ -155,10 +157,12 @@ pub fn draw_playing_card_big(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, car
             .with_bg(bg_color)
             .with_bold(true);
 
-        draw_queue.push(DrawCall {
+        draw_calls.push(DrawCall {
             x: x,
             y: y + row_index as u16,
             rich_text,
         });
     }
+
+    draw_calls
 }
