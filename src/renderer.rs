@@ -154,8 +154,8 @@ impl RichText {
 #[derive(Clone)]
 pub struct Cell {
     pub ch: char,
-    pub fg: RGBA,
-    pub bg: RGBA,
+    pub fg: u32, // Packed RGB: 0x00RRGGBB
+    pub bg: u32, // Packed RGB: 0x00RRGGBB
     pub bold: bool,
 }
 
@@ -166,11 +166,13 @@ pub struct ScreenBuffer {
 }
 
 impl ScreenBuffer {
-    fn new(width: u16, height: u16, default_bg: RGBA) -> Self {
+    fn new(width: u16, height: u16, default_bg: (u8, u8, u8)) -> Self {
         let cell = Cell {
             ch: ' ',
-            fg: RGBA::from_u8(255, 255, 255, 1.0),
-            bg: default_bg,
+            fg: pack_rgb(255, 255, 255),
+            bg: pack_rgb(default_bg.0, default_bg.1, default_bg.2),
+            // fg: RGBA::from_u8(255, 255, 255, 1.0),
+            // bg: default_bg,
             bold: false,
         };
         Self {
@@ -187,7 +189,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new(width: u16, height: u16, default_bg: RGBA) -> Self {
+    pub fn new(width: u16, height: u16, default_bg: (u8, u8, u8)) -> Self {
         Self {
             old_buffer: ScreenBuffer::new(width, height, default_bg),
             new_buffer: ScreenBuffer::new(width, height, default_bg),
@@ -254,7 +256,7 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
             let cell: &mut Cell = &mut buf.cells[(y * buf.width + x) as usize];
             let new_rich_text: &RichText = &dc.rich_text;
 
-            let is_old_char_visible: bool = cell.ch != ' ' && cell.fg.a > 0.0;
+            let is_old_char_visible: bool = cell.ch != ' ' && cell.fg != 0;
             let is_new_char_visible: bool = new_char != ' ' && new_rich_text.fg.a > 0.0;
             let preserve_old_bg: bool = new_rich_text.bg.a == 0.0;
             let skip_fg_blending: bool = dc.rich_text.fg.a == 1.0 || dc.rich_text.fg.a == 0.0;
@@ -265,19 +267,25 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                 cell.bold = new_rich_text.bold;
 
                 if skip_fg_blending {
-                    cell.fg = new_rich_text.fg;
+                    cell.fg = rgba_to_packed_rgb(&new_rich_text.fg);
                 } else {
-                    #[rustfmt::skip]
-                    let bottom_color: RGBA = if is_old_char_visible { cell.fg } else { cell.bg };
-                    cell.fg = blend_source_over(&bottom_color, &new_rich_text.fg);
+                    let bottom_color: RGBA = if is_old_char_visible {
+                        packed_rgb_to_rgba(cell.fg)
+                    } else {
+                        packed_rgb_to_rgba(cell.bg)
+                    };
+                    let blended_fg = blend_source_over(&bottom_color, &new_rich_text.fg);
+                    cell.fg = rgba_to_packed_rgb(&blended_fg);
                 }
             }
 
             if !preserve_old_bg {
                 if skip_bg_blending {
-                    cell.bg = new_rich_text.bg;
+                    cell.bg = rgba_to_packed_rgb(&new_rich_text.bg);
                 } else {
-                    cell.bg = blend_source_over(&cell.bg, &new_rich_text.bg)
+                    let old_bg = packed_rgb_to_rgba(cell.bg);
+                    let blended_bg = blend_source_over(&old_bg, &new_rich_text.bg);
+                    cell.bg = rgba_to_packed_rgb(&blended_bg);
                 }
             }
 
@@ -286,11 +294,11 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
     }
 }
 
-pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: RGBA) {
+pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: (u8, u8, u8)) {
     for cell in buf.cells.iter_mut() {
         cell.ch = ' ';
-        cell.fg = RGBA::from_u8(0, 0, 0, 1.0);
-        cell.bg = bg;
+        cell.fg = 0x000000; // Black
+        cell.bg = pack_rgb(bg.0, bg.1, bg.2);
         cell.bold = false;
     }
 }
@@ -306,7 +314,29 @@ pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, h: u16,
     }
 }
 
-pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
+fn pack_rgb(r: u8, g: u8, b: u8) -> u32 {
+    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+}
+
+fn unpack_rgb(packed: u32) -> (u8, u8, u8) {
+    (
+        ((packed >> 16) & 0xFF) as u8,
+        ((packed >> 8) & 0xFF) as u8,
+        (packed & 0xFF) as u8,
+    )
+}
+
+fn rgba_to_packed_rgb(rgba: &RGBA) -> u32 {
+    pack_rgb(rgba.r, rgba.g, rgba.b)
+}
+
+fn packed_rgb_to_rgba(packed_rgb: u32) -> RGBA {
+    const ALPHA: f32 = 1.0;
+    let (r, g, b) = unpack_rgb(packed_rgb);
+    RGBA::from_u8(r, g, b, ALPHA)
+}
+
+fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
     let top_alpha = top.a.clamp(0.0, 1.0);
     let bottom_alpha = bottom.a.clamp(0.0, 1.0);
 
@@ -330,16 +360,19 @@ pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
 }
 
 pub fn build_crossterm_content_style(cell: &Cell) -> ContentStyle {
+    let (fg_r, fg_g, fg_b) = unpack_rgb(cell.fg);
+    let (bg_r, bg_g, bg_b) = unpack_rgb(cell.bg);
+
     let fg_color = Color::Rgb {
-        r: cell.fg.r,
-        g: cell.fg.g,
-        b: cell.fg.b,
+        r: fg_r,
+        g: fg_g,
+        b: fg_b,
     };
 
     let bg_color = Color::Rgb {
-        r: cell.bg.r,
-        g: cell.bg.g,
-        b: cell.bg.b,
+        r: bg_r,
+        g: bg_g,
+        b: bg_b,
     };
 
     let mut attrs = Attributes::none();

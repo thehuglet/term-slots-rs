@@ -73,7 +73,7 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     };
 
     // --- Rendering ---
-    fill_screen_background(&mut ctx.screen.new_buffer, RGBA::from_u8(0, 0, 0, 1.0));
+    fill_screen_background(&mut ctx.screen.new_buffer, (0, 0, 0));
     let mut draw_queue: Vec<DrawCall> = vec![];
 
     // --- PLASMA SHADER BACKGROUND ---
@@ -136,7 +136,7 @@ fn main() -> io::Result<()> {
     let (width, height) = terminal::size()?;
 
     let mut ctx = Context {
-        screen: Screen::new(width, height, RGBA::from_u8(0, 0, 0, 1.0)),
+        screen: Screen::new(width, height, (0, 0, 0)),
         mouse: MouseContext {
             x: 0,
             y: 0,

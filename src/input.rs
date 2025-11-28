@@ -30,7 +30,7 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
     match event {
         Event::Resize(w, h) => {
             // Recreate screen on resize to avoid graphical anomalies
-            ctx.screen = Screen::new(w, h, RGBA::from_u8(0, 0, 0, 1.0));
+            ctx.screen = Screen::new(w, h, (0, 0, 0));
         }
         Event::Key(KeyEvent { code, .. }) => match code {
             KeyCode::Char('q') | KeyCode::Esc => return ProgramStatus::Exit,
