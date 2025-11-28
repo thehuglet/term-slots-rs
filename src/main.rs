@@ -1,59 +1,52 @@
 mod button;
 mod constants;
 mod context;
+mod dragged_card;
 mod fps_counter;
 mod fps_limiter;
 mod game_state;
+mod hand;
 mod input;
 mod playing_card;
 mod renderer;
 mod slots;
+mod table;
 
 use crossterm::{
     cursor,
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute, queue,
     style::{Print, ResetColor, SetStyle},
     terminal::{self},
 };
+use rand::seq::SliceRandom;
 use std::{
     io::{self, Stdout, Write},
-    time::{self, Duration},
+    process::exit,
+    time::Duration,
 };
 
 use crate::{
     button::{Button, draw_button},
+    constants::{HAND_ORIGIN_X, HAND_ORIGIN_Y},
     context::{Context, MouseContext},
+    dragged_card::DraggedCardContext,
     fps_counter::{FPSCounter, draw_fps_counter},
     fps_limiter::FPSLimiter,
+    hand::{CardInHand, Hand, draw_hand},
     input::{ProgramStatus, resolve_input},
-    playing_card::{
-        PlayingCard, Rank, Suit, draw_calls_playing_card_big, draw_calls_playing_card_small,
-    },
+    playing_card::{PlayingCard, Rank, Suit},
     renderer::{
         Cell, DrawCall, HSL, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
-        diff_buffers, draw_rect, fill_screen_background,
+        diff_buffers, fill_screen_background,
     },
-    slots::{Column, Slots, draw_slots},
+    slots::{
+        Column, Slots, calc_column_spin_duration_sec, draw_slots, slots_stopped, spin_slots_column,
+    },
+    table::{CardOnTable, Table, draw_table},
 };
 
-fn plasma_shader(x: u16, y: u16, time: f32) -> RGBA {
-    let fx = x as f32 / 80.0;
-    let fy = y as f32 / 24.0;
-
-    let value =
-        ((fx + time).sin() + (fy + time * 0.7).cos() + ((fx + fy + time * 1.3).sin() * 2.0)).sin();
-
-    let hue = (value * 0.5 + 0.5) * 360.0;
-    RGBA::from_hsl(HSL {
-        h: hue,
-        s: 0.8,
-        l: 0.4,
-        a: 1.0,
-    })
-}
-
-fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
+fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     // --- Button definitions ---
     let mut buttons: Vec<Button> = vec![];
 
@@ -62,7 +55,14 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
         y: 10,
         text: "SPIN",
         color: RGBA::from_u8(255, 151, 0, 1.0),
-        disabled: false,
+        on_click: |ctx: &mut Context| {
+            for (column_index, column) in ctx.slots.columns.iter_mut().enumerate() {
+                let spin_duration: f32 = calc_column_spin_duration_sec(column_index);
+                column.spin_duration = spin_duration;
+                column.spin_time_remaining = spin_duration;
+            }
+        },
+        enabled_when: |ctx: &Context| slots_stopped(&ctx.slots),
     });
 
     // --- Inputs ---
@@ -72,40 +72,34 @@ fn tick(ctx: &mut Context, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
         ProgramStatus::Running
     };
 
+    // --- Game logic ---
+    for column in &mut ctx.slots.columns {
+        const MAX_SPIN_SPEED: f32 = 60.0;
+        spin_slots_column(column, dt, MAX_SPIN_SPEED);
+    }
+
     // --- Rendering ---
     fill_screen_background(&mut ctx.screen.new_buffer, (0, 0, 0));
     let mut draw_queue: Vec<DrawCall> = vec![];
 
-    // --- PLASMA SHADER BACKGROUND ---
-    let (width, height) = (ctx.screen.new_buffer.width, ctx.screen.new_buffer.height);
-    for y in 0..height {
-        for x in 0..width {
-            let color = plasma_shader(x, y, ctx.game_time as f32);
-            draw_queue.push(DrawCall {
-                x,
-                y,
-                rich_text: RichText::new(" ").with_bg(color),
-            });
-        }
-    }
+    draw_slots(&mut draw_queue, 8, 5, &ctx.slots);
+    draw_table(&mut draw_queue, 9, 13, &ctx.table);
+    draw_hand(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y, &ctx.hand);
 
-    draw_slots(&mut draw_queue, 5, 5, &ctx.slots);
-
-    for button in buttons {
-        draw_button(&mut draw_queue, &button, &ctx.mouse)
+    for button in &mut buttons {
+        draw_button(&mut draw_queue, &ctx, &button)
     }
 
     draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
 
     // --- Renderer boilerplate ---
     compose_buffer(&mut ctx.screen.new_buffer, &draw_queue);
-    let diff: Vec<(usize, usize, &Cell)> =
-        diff_buffers(&ctx.screen.old_buffer, &ctx.screen.new_buffer);
+    let diff: Vec<(u16, u16, &Cell)> = diff_buffers(&ctx.screen.old_buffer, &ctx.screen.new_buffer);
 
     for (x, y, cell) in diff {
         queue!(
             stdout,
-            cursor::MoveTo(x as u16, y as u16),
+            cursor::MoveTo(x, y),
             SetStyle(build_crossterm_content_style(&cell)),
             Print(cell.ch),
             ResetColor,
@@ -142,6 +136,7 @@ fn main() -> io::Result<()> {
             y: 0,
             is_down: false,
         },
+        dragged_card_ctx: DraggedCardContext { card: None },
         game_time: 0.0,
         slots: Slots {
             spin_count: 0,
@@ -156,15 +151,43 @@ fn main() -> io::Result<()> {
                 3
             ],
         },
+        table: Table {
+            cards_on_table: vec![
+                CardOnTable {
+                    card: PlayingCard {
+                        suit: Suit::Spade,
+                        rank: Rank::Num10
+                    }
+                };
+                3
+            ],
+        },
+        hand: Hand {
+            cursor: 0,
+            hand_size: 10,
+            cards_in_hand: vec![
+                CardInHand {
+                    card: PlayingCard {
+                        suit: Suit::Heart,
+                        rank: Rank::Num2,
+                    }
+                };
+                5
+            ],
+        },
         fps_counter: FPSCounter::new(0.08),
     };
 
-    let mut fps_limiter = FPSLimiter::new(0.0, 0.001, 0.002);
+    for column in &mut ctx.slots.columns {
+        column.cards.shuffle(&mut rand::rng());
+    }
+
+    let mut fps_limiter = FPSLimiter::new(100.0, 0.001, 0.002);
 
     'game_loop: loop {
         let dt: f64 = fps_limiter.wait();
 
-        if tick(&mut ctx, &mut stdout)? == ProgramStatus::Exit {
+        if tick(&mut ctx, dt as f32, &mut stdout)? == ProgramStatus::Exit {
             break 'game_loop;
         }
 

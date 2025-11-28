@@ -1,7 +1,10 @@
 use crate::{
-    constants::{COLOR_BLACK, COLOR_RED, DEFAULT_CARD_BG_COLOR},
+    constants::{DEFAULT_CARD_BG_COLOR, SUIT_COLOR_BLACK, SUIT_COLOR_RED},
     renderer::{DrawCall, RGBA, RichText},
 };
+
+pub const BIG_CARD_WIDTH: u16 = 3;
+pub const BIG_CARD_HEIGHT: u16 = 3;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Suit {
@@ -23,10 +26,10 @@ impl Suit {
 
     pub fn color(&self) -> RGBA {
         match self {
-            Suit::Spade => COLOR_BLACK,
-            Suit::Heart => COLOR_RED,
-            Suit::Club => COLOR_BLACK,
-            Suit::Diamond => COLOR_RED,
+            Suit::Spade => SUIT_COLOR_BLACK,
+            Suit::Heart => SUIT_COLOR_RED,
+            Suit::Club => SUIT_COLOR_BLACK,
+            Suit::Diamond => SUIT_COLOR_RED,
         }
     }
 
@@ -154,8 +157,7 @@ pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<Dr
 
         let rich_text = RichText::new(text_row)
             .with_fg(suit_color)
-            .with_bg(bg_color)
-            .with_bold(true);
+            .with_bg(bg_color);
 
         draw_calls.push(DrawCall {
             x: x,

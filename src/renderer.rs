@@ -26,8 +26,10 @@ impl RGBA {
             a: a.clamp(0.0, 1.0),
         }
     }
+}
 
-    pub fn from_hsl(hsl: HSL) -> Self {
+impl From<HSL> for RGBA {
+    fn from(hsl: HSL) -> Self {
         let HSL { h, s, l, a } = hsl;
 
         let chroma = (1.0 - (2.0 * l - 1.0).abs()) * s;
@@ -64,8 +66,8 @@ pub struct HSL {
     pub a: f32,
 }
 
-impl HSL {
-    pub fn from_rgba(rgba: RGBA) -> Self {
+impl From<RGBA> for HSL {
+    fn from(rgba: RGBA) -> Self {
         let RGBA { r, g, b, a } = rgba;
 
         let red = r as f32 / 255.0;
@@ -218,10 +220,7 @@ pub fn point_in_rect(
     x >= rect_x1 && x <= rect_x2 && y >= rect_y1 && y <= rect_y2
 }
 
-pub fn diff_buffers<'a>(
-    old: &'a ScreenBuffer,
-    new: &'a ScreenBuffer,
-) -> Vec<(usize, usize, &'a Cell)> {
+pub fn diff_buffers<'a>(old: &'a ScreenBuffer, new: &'a ScreenBuffer) -> Vec<(u16, u16, &'a Cell)> {
     let mut diffs = Vec::new();
     let h: usize = old.height.min(new.height) as usize;
     let w: usize = old.width.min(new.width) as usize;
@@ -235,7 +234,7 @@ pub fn diff_buffers<'a>(
                 || old_cell.bg != new_cell.bg
                 || old_cell.bold != new_cell.bold
             {
-                diffs.push((x, y, new_cell));
+                diffs.push((x as u16, y as u16, new_cell));
             }
         }
     }
