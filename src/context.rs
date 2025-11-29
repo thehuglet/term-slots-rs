@@ -18,4 +18,5 @@ pub struct MouseContext {
     pub x: u16,
     pub y: u16,
     pub is_down: bool,
+    pub is_dragging: bool,
 }

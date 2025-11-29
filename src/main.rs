@@ -22,7 +22,6 @@ use crossterm::{
 use rand::seq::SliceRandom;
 use std::{
     io::{self, Stdout, Write},
-    process::exit,
     time::Duration,
 };
 
@@ -34,11 +33,13 @@ use crate::{
     fps_counter::{FPSCounter, draw_fps_counter},
     fps_limiter::FPSLimiter,
     hand::{CardInHand, Hand, draw_hand},
-    input::{ProgramStatus, resolve_input},
-    playing_card::{PlayingCard, Rank, Suit},
+    input::{ProgramStatus, drain_input, resolve_input},
+    playing_card::{
+        BIG_CARD_HEIGHT, BIG_CARD_WIDTH, PlayingCard, Rank, Suit, draw_calls_playing_card_big,
+    },
     renderer::{
         Cell, DrawCall, HSL, RGBA, RichText, Screen, build_crossterm_content_style, compose_buffer,
-        diff_buffers, fill_screen_background,
+        diff_buffers, draw_rect, fill_screen_background,
     },
     slots::{
         Column, Slots, calc_column_spin_duration_sec, draw_slots, slots_stopped, spin_slots_column,
@@ -66,11 +67,11 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     });
 
     // --- Inputs ---
-    let program_status: ProgramStatus = if event::poll(Duration::from_millis(0))? {
-        resolve_input(ctx, event::read()?, &buttons)
-    } else {
-        ProgramStatus::Running
-    };
+    for event in drain_input() {
+        if let ProgramStatus::Exit = resolve_input(ctx, event, &buttons) {
+            return Ok(ProgramStatus::Exit);
+        }
+    }
 
     // --- Game logic ---
     for column in &mut ctx.slots.columns {
@@ -79,7 +80,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     // --- Rendering ---
-    fill_screen_background(&mut ctx.screen.new_buffer, (0, 0, 0));
+    fill_screen_background(&mut ctx.screen.new_buffer, (0, 50, 0));
     let mut draw_queue: Vec<DrawCall> = vec![];
 
     draw_slots(&mut draw_queue, 8, 5, &ctx.slots);
@@ -88,6 +89,21 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
 
     for button in &mut buttons {
         draw_button(&mut draw_queue, &ctx, &button)
+    }
+
+    // Card dragging experiment
+    if let Some(card) = &ctx.dragged_card_ctx.dragged_card {
+        // Card Shadow
+        draw_rect(
+            &mut draw_queue,
+            ctx.mouse.x.saturating_sub(1),
+            ctx.mouse.y + 1,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
+            RGBA::from_f32(0.0, 0.0, 0.0, 0.5),
+        );
+
+        draw_queue.extend(draw_calls_playing_card_big(ctx.mouse.x, ctx.mouse.y, card));
     }
 
     draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
@@ -108,7 +124,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
 
     stdout.flush()?;
     ctx.screen.swap_buffers();
-    Ok(program_status)
+    Ok(ProgramStatus::Running)
 }
 
 fn main() -> io::Result<()> {
@@ -117,6 +133,8 @@ fn main() -> io::Result<()> {
     let full_deck: Vec<PlayingCard> = Suit::iter()
         .flat_map(|suit| Rank::iter().map(move |rank| PlayingCard { suit, rank }))
         .collect();
+
+    let (width, height) = terminal::size()?;
 
     terminal::enable_raw_mode()?;
     execute!(
@@ -127,16 +145,18 @@ fn main() -> io::Result<()> {
         EnableMouseCapture
     )?;
 
-    let (width, height) = terminal::size()?;
-
     let mut ctx = Context {
         screen: Screen::new(width, height, (0, 0, 0)),
         mouse: MouseContext {
             x: 0,
             y: 0,
             is_down: false,
+            is_dragging: false,
         },
-        dragged_card_ctx: DraggedCardContext { card: None },
+        dragged_card_ctx: DraggedCardContext {
+            card: None,
+            dragged_card: None,
+        },
         game_time: 0.0,
         slots: Slots {
             spin_count: 0,
@@ -182,7 +202,7 @@ fn main() -> io::Result<()> {
         column.cards.shuffle(&mut rand::rng());
     }
 
-    let mut fps_limiter = FPSLimiter::new(100.0, 0.001, 0.002);
+    let mut fps_limiter: FPSLimiter = FPSLimiter::new(0.0, 0.001, 0.002);
 
     'game_loop: loop {
         let dt: f64 = fps_limiter.wait();

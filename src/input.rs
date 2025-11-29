@@ -1,6 +1,6 @@
-use std::process::exit;
+use std::{io, process::exit, time::Duration};
 
-use crossterm::event::{Event, KeyCode, KeyEvent, MouseButton, MouseEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseButton, MouseEventKind};
 
 use crate::{
     button::Button,
@@ -30,9 +30,6 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
         Event::Mouse(event) => match event.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 ctx.mouse.is_down = true;
-            }
-            MouseEventKind::Up(MouseButton::Left) => {
-                ctx.mouse.is_down = false;
 
                 // Card ui rect detection
                 // > Hand
@@ -42,9 +39,16 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
                     let x2: u16 = x1 + BIG_CARD_WIDTH - 1;
                     let y2: u16 = y1 + BIG_CARD_HEIGHT - 1;
                     if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
-                        exit(0)
+                        ctx.dragged_card_ctx.dragged_card =
+                            Some(ctx.hand.cards_in_hand[card_index].card.clone())
                     }
                 }
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                ctx.mouse.is_down = false;
+                ctx.mouse.is_dragging = false;
+
+                ctx.dragged_card_ctx.dragged_card = None;
 
                 for button in buttons {
                     let button_x2: u16 = button.x + button.text.len() as u16 + 1;
@@ -71,6 +75,7 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
             MouseEventKind::Drag(MouseButton::Left) => {
                 ctx.mouse.x = event.column;
                 ctx.mouse.y = event.row;
+                ctx.mouse.is_dragging = true;
             }
             _ => {}
         },
@@ -79,22 +84,12 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
     ProgramStatus::Running
 }
 
-// pub fn resolve_action(ctx: &mut Context, action: Option<Action>) -> ProgramStatus {
-//     if let Some(a) = action {
-//         match a {
-//             Action::ExitGame => return ProgramStatus::Exit,
-//             Action::SpinSlots => {}
-//             Action::MouseMove { x, y } => {
-//                 ctx.mouse.x = x;
-//                 ctx.mouse.y = y;
-//             }
-//             Action::WindowResize { w, h } => {
-//                 // Recreate screen on resize to avoid graphical anomalies
-//                 ctx.screen = Screen::new(w, h, RGBA::from_u8(0, 0, 0, 1.0));
-//             }
-//             Action::MouseDrag => {}
-//         }
-//     }
-
-//     ProgramStatus::Running
-// }
+pub fn drain_input() -> impl Iterator<Item = Event> {
+    std::iter::from_fn(|| {
+        if event::poll(Duration::from_millis(0)).ok()? {
+            event::read().ok()
+        } else {
+            None
+        }
+    })
+}

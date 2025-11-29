@@ -157,7 +157,8 @@ pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<Dr
 
         let rich_text = RichText::new(text_row)
             .with_fg(suit_color)
-            .with_bg(bg_color);
+            .with_bg(bg_color)
+            .with_bold(true);
 
         draw_calls.push(DrawCall {
             x: x,

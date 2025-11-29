@@ -256,12 +256,12 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
             let new_rich_text: &RichText = &dc.rich_text;
 
             let is_old_char_visible: bool = cell.ch != ' ' && cell.fg != 0;
-            let is_new_char_visible: bool = new_char != ' ' && new_rich_text.fg.a > 0.0;
+            let new_char_should_override_old: bool = new_rich_text.fg.a == 1.0;
             let preserve_old_bg: bool = new_rich_text.bg.a == 0.0;
             let skip_fg_blending: bool = dc.rich_text.fg.a == 1.0 || dc.rich_text.fg.a == 0.0;
             let skip_bg_blending: bool = dc.rich_text.bg.a == 1.0 || dc.rich_text.bg.a == 0.0;
 
-            if is_new_char_visible {
+            if new_char_should_override_old {
                 cell.ch = new_char;
                 cell.bold = new_rich_text.bold;
 
@@ -276,14 +276,18 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                     let blended_fg = blend_source_over(&bottom_color, &new_rich_text.fg);
                     cell.fg = rgba_to_packed_rgb(&blended_fg);
                 }
+            } else if !skip_bg_blending {
+                // Special case for no new char but new blended bg => tint the old fg
+                let old_fg: RGBA = packed_rgb_to_rgba(cell.fg);
+                cell.fg = rgba_to_packed_rgb(&blend_source_over(&old_fg, &new_rich_text.bg))
             }
 
             if !preserve_old_bg {
                 if skip_bg_blending {
                     cell.bg = rgba_to_packed_rgb(&new_rich_text.bg);
                 } else {
-                    let old_bg = packed_rgb_to_rgba(cell.bg);
-                    let blended_bg = blend_source_over(&old_bg, &new_rich_text.bg);
+                    let old_bg: RGBA = packed_rgb_to_rgba(cell.bg);
+                    let blended_bg: RGBA = blend_source_over(&old_bg, &new_rich_text.bg);
                     cell.bg = rgba_to_packed_rgb(&blended_bg);
                 }
             }
@@ -308,7 +312,10 @@ pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, h: u16,
         draw_queue.push(DrawCall {
             x: x,
             y: y + row,
-            rich_text: RichText::new(" ".repeat(w as usize)).with_bg(color),
+            rich_text: RichText::new(" ".repeat(w as usize))
+                // This ensures the char below is drawn
+                .with_fg(RGBA::from_u8(0, 0, 0, 0.0))
+                .with_bg(color),
         })
     }
 }
