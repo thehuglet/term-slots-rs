@@ -118,7 +118,7 @@ pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &PlayingCard) -> Draw
     }
 }
 
-pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<DrawCall> {
+pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &PlayingCard) -> Vec<DrawCall> {
     let mut draw_calls: Vec<DrawCall> = vec![];
 
     let suit_repr: &'static str = card.suit.repr();
@@ -149,11 +149,30 @@ pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<Dr
     };
 
     for (row_index, pattern_row) in pattern.iter().enumerate() {
-        let mut text_row = pattern_row.to_string();
+        let line_x: i16 = x.max(0);
+        let line_y: i16 = y + row_index as i16;
 
+        // y clipping
+        if line_y < 0 {
+            continue;
+        }
+
+        let mut text_row = pattern_row.to_string();
         text_row = text_row.replace("<<", &format!("{:<2}", rank_repr));
         text_row = text_row.replace(">>", &format!("{:>2}", rank_repr));
         text_row = text_row.replace("S", suit_repr);
+
+        // x clipping
+        if x < 0 {
+            let chars_to_trim = -x as usize;
+            let char_count = text_row.chars().count();
+
+            if chars_to_trim >= char_count {
+                continue;
+            }
+
+            text_row = text_row.chars().skip(chars_to_trim).collect::<String>();
+        }
 
         let rich_text = RichText::new(text_row)
             .with_fg(suit_color)
@@ -161,11 +180,24 @@ pub fn draw_calls_playing_card_big(x: u16, y: u16, card: &PlayingCard) -> Vec<Dr
             .with_bold(true);
 
         draw_calls.push(DrawCall {
-            x: x,
-            y: y + row_index as u16,
+            x: line_x as u16,
+            y: line_y as u16,
             rich_text,
         });
     }
 
     draw_calls
+}
+
+pub fn get_card_hitbox_rect(
+    origin_x: u16,
+    origin_y: u16,
+    spacing: u16,
+    index: usize,
+) -> (u16, u16, u16, u16) {
+    let x1: u16 = origin_x + index as u16 * spacing;
+    let y1: u16 = origin_y;
+    let x2: u16 = x1 + BIG_CARD_WIDTH - 1;
+    let y2: u16 = y1 + BIG_CARD_HEIGHT - 1;
+    (x1, y1, x2, y2)
 }

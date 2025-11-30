@@ -1,6 +1,7 @@
 use crate::{
+    constants::SLOTS_COLUMNS_X_SPACING,
     playing_card::{PlayingCard, draw_calls_playing_card_small},
-    renderer::{DrawCall, HSL, RGBA, RichText},
+    renderer::{DrawCall, HSL},
 };
 
 pub struct Slots {
@@ -85,11 +86,9 @@ pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
 }
 
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots) {
-    const X_SPACING: u16 = 5;
-
     for (col_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = col_index as u16;
-        let column_x: u16 = x + n * X_SPACING;
+        let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;
 
         draw_column(draw_queue, column_x, column_y, column);

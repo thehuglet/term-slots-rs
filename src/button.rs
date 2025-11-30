@@ -1,15 +1,29 @@
 use crate::{
-    context::{Context, MouseContext},
+    context::Context,
+    dragged_card::CardDragState,
     renderer::{DrawCall, HSL, RGBA, RichText, draw_rect, point_in_rect},
 };
 
 pub struct Button {
     pub x: u16,
     pub y: u16,
-    pub text: &'static str,
+    pub text: String,
     pub color: RGBA,
     pub on_click: fn(&mut Context),
     pub enabled_when: fn(&Context) -> bool,
+}
+
+pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
+    for button in buttons {
+        let button_x2: u16 = button.x + button.text.len() as u16 + 1;
+        let button_y2: u16 = button.y;
+
+        if point_in_rect(x, y, button.x, button.y, button_x2, button_y2) {
+            return Some(button);
+        };
+    }
+
+    None
 }
 
 pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Button) {
@@ -18,8 +32,8 @@ pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Butto
 
     draw_rect(
         draw_queue,
-        button.x,
-        button.y,
+        button.x as i16,
+        button.y as i16,
         w,
         h,
         button_bg(ctx, &button),
@@ -27,7 +41,7 @@ pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Butto
     draw_queue.push(DrawCall {
         x: button.x + 1,
         y: button.y,
-        rich_text: RichText::new(button.text)
+        rich_text: RichText::new(&button.text)
             .with_fg(RGBA::from_f32(0.0, 0.0, 0.0, 1.0))
             .with_bold(true),
     })
@@ -49,16 +63,20 @@ fn button_bg(ctx: &Context, button: &Button) -> RGBA {
         button_x2,
         button_y2,
     );
-    let is_pressed: bool = is_hovered && ctx.mouse.is_down;
+    let is_pressed: bool = is_hovered && ctx.mouse.is_left_down;
     let is_disabled: bool = !(button.enabled_when)(ctx);
+    let is_dragging_anything: bool = matches!(ctx.mouse.card_drag, CardDragState::Dragging { .. });
 
     if is_disabled {
-        hsl.l *= 0.5;
+        hsl.l *= 0.4;
         hsl.s *= 0.4;
-    } else if is_pressed {
-        hsl.l *= 0.65;
-    } else if is_hovered {
-        hsl.l *= 1.35;
+    } else if !is_dragging_anything {
+        if is_pressed {
+            hsl.l *= 0.3;
+            hsl.s *= 0.3;
+        } else if is_hovered {
+            hsl.l += 0.08;
+        }
     }
 
     hsl.into()

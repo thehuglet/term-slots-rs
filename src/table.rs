@@ -1,12 +1,14 @@
 use crate::{
+    constants::TABLE_CARD_X_SPACING,
+    context::Context,
+    dragged_card::{CardDragState, DragAndDropLocation, dragged_source_vfx_sinewave},
     playing_card::{PlayingCard, draw_calls_playing_card_big},
     renderer::{DrawCall, HSL},
+    utils::iter_some,
 };
 
-const TABLE_CARD_X_SPACING: u16 = 4;
-
 pub struct Table {
-    pub cards_on_table: Vec<CardOnTable>,
+    pub cards_on_table: Vec<Option<CardOnTable>>,
 }
 
 #[derive(Clone)]
@@ -14,26 +16,39 @@ pub struct CardOnTable {
     pub card: PlayingCard,
 }
 
-pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, table: &Table) {
-    for (card_on_table_index, card_on_table) in table.cards_on_table.iter().enumerate() {
+pub fn draw_table(draw_queue: &mut Vec<DrawCall>, ctx: &Context, x: u16, y: u16) {
+    for (index, card_on_table) in iter_some(&ctx.table.cards_on_table) {
         let card: &PlayingCard = &card_on_table.card;
 
-        let n: u16 = card_on_table_index as u16;
+        let n: u16 = index as u16;
         let card_x: u16 = x + n * TABLE_CARD_X_SPACING;
         let card_y: u16 = y;
+        let is_being_dragged = matches!(ctx.mouse.card_drag,
+            CardDragState::Dragging {
+                source: DragAndDropLocation::Table { index: src_index },
+                ..
+            } if src_index == index
+        );
 
-        let mut draw_calls: Vec<DrawCall> = draw_calls_playing_card_big(card_x, card_y, card);
+        let mut draw_calls: Vec<DrawCall> =
+            draw_calls_playing_card_big(card_x as i16, card_y as i16, card);
 
-        // for dc in &mut draw_calls {
-        //     let mut fg_hsl: HSL = dc.rich_text.fg.into();
-        //     let mut bg_hsl: HSL = dc.rich_text.bg.into();
+        for dc in &mut draw_calls {
+            let mut fg_hsl: HSL = dc.rich_text.fg.into();
+            let mut bg_hsl: HSL = dc.rich_text.bg.into();
 
-        //     fg_hsl.l *= 0.7;
-        //     bg_hsl.l *= 0.7;
+            if is_being_dragged {
+                let sinewave: f32 = dragged_source_vfx_sinewave(ctx.game_time as f32);
+                fg_hsl.l *= sinewave;
+                bg_hsl.l *= sinewave;
+            }
 
-        //     dc.rich_text.fg = fg_hsl.into();
-        //     dc.rich_text.bg = bg_hsl.into();
-        // }
+            fg_hsl.l *= 0.85;
+            bg_hsl.l *= 0.85;
+
+            dc.rich_text.fg = fg_hsl.into();
+            dc.rich_text.bg = bg_hsl.into();
+        }
 
         draw_queue.extend(draw_calls)
     }

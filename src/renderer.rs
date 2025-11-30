@@ -164,7 +164,7 @@ pub struct Cell {
 pub struct ScreenBuffer {
     pub width: u16,
     pub height: u16,
-    cells: Vec<Cell>,
+    pub cells: Vec<Cell>,
 }
 
 impl ScreenBuffer {
@@ -277,7 +277,7 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                     cell.fg = rgba_to_packed_rgb(&blended_fg);
                 }
             } else if !skip_bg_blending {
-                // Special case for no new char but new blended bg => tint the old fg
+                // Special case for no new char but new blended bg => tint the old fgq
                 let old_fg: RGBA = packed_rgb_to_rgba(cell.fg);
                 cell.fg = rgba_to_packed_rgb(&blend_source_over(&old_fg, &new_rich_text.bg))
             }
@@ -307,13 +307,35 @@ pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: (u8, u8, u8)) {
 }
 
 /// Helper for drawing rectangles
-pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, h: u16, color: RGBA) {
-    for row in 0..h {
+pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16, color: RGBA) {
+    for row_index in 0..h as i16 {
+        let line_x: i16 = x.max(0);
+        let line_y: i16 = y + row_index;
+
+        let mut text_row: String = " ".repeat(w as usize);
+
+        // x clipping
+        if x < 0 {
+            let chars_to_trim = -x as usize;
+            let char_count = w as usize;
+
+            if chars_to_trim >= char_count {
+                continue;
+            }
+
+            text_row = text_row.chars().skip(chars_to_trim).collect::<String>()
+        }
+
+        // y clipping
+        if line_y < 0 {
+            continue;
+        }
+
         draw_queue.push(DrawCall {
-            x: x,
-            y: y + row,
-            rich_text: RichText::new(" ".repeat(w as usize))
-                // This ensures the char below is drawn
+            x: line_x as u16,
+            y: line_y as u16,
+            rich_text: RichText::new(text_row)
+                // This ensures the old buf char is drawn
                 .with_fg(RGBA::from_u8(0, 0, 0, 0.0))
                 .with_bg(color),
         })
@@ -324,6 +346,34 @@ fn pack_rgb(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
 }
 
+pub fn build_vignette_lut(
+    width: usize,
+    height: usize,
+    radius_scale: f32,
+    falloff: f32,
+    strength: f32,
+) -> Vec<f32> {
+    let mut lut = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let nx = (2.0 * x as f32) / (width as f32 * 2.0) - 0.5;
+            let ny = (y as f32) / (height as f32) - 0.5;
+            let d = (nx * nx + ny * ny).sqrt();
+            let alpha = (d * radius_scale).powf(falloff).clamp(0.0, 1.0) * strength;
+            lut.push(alpha);
+        }
+    }
+    lut
+}
+
+pub fn build_gamma_lut(gamma: f32) -> [u8; 256] {
+    let mut lut = [0u8; 256];
+    for i in 0..256 {
+        lut[i] = ((i as f32 / 255.0).powf(gamma) * 255.0).round() as u8;
+    }
+    lut
+}
+
 fn unpack_rgb(packed: u32) -> (u8, u8, u8) {
     (
         ((packed >> 16) & 0xFF) as u8,
@@ -332,17 +382,17 @@ fn unpack_rgb(packed: u32) -> (u8, u8, u8) {
     )
 }
 
-fn rgba_to_packed_rgb(rgba: &RGBA) -> u32 {
+pub fn rgba_to_packed_rgb(rgba: &RGBA) -> u32 {
     pack_rgb(rgba.r, rgba.g, rgba.b)
 }
 
-fn packed_rgb_to_rgba(packed_rgb: u32) -> RGBA {
+pub fn packed_rgb_to_rgba(packed_rgb: u32) -> RGBA {
     const ALPHA: f32 = 1.0;
     let (r, g, b) = unpack_rgb(packed_rgb);
     RGBA::from_u8(r, g, b, ALPHA)
 }
 
-fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
+pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
     let top_alpha = top.a.clamp(0.0, 1.0);
     let bottom_alpha = bottom.a.clamp(0.0, 1.0);
 
