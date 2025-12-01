@@ -4,10 +4,10 @@ use crate::{
         TABLE_ORIGIN_Y,
     },
     context::Context,
-    hand::{CardInHand, Hand},
+    hand::CardInHand,
     playing_card::{PlayingCard, get_card_hitbox_rect},
     renderer::point_in_rect,
-    table::{CardOnTable, Table},
+    table::CardOnTable,
 };
 
 pub enum CardDragState {
@@ -31,48 +31,48 @@ pub fn dragged_source_vfx_sinewave(t: f32) -> f32 {
 /// Retrieves the location at which a card was dropped if it was dropped on one.
 pub fn get_valid_drop_destination(
     ctx: &mut Context,
-    source: &DragAndDropLocation,
+    source_location: &DragAndDropLocation,
 ) -> Option<DragAndDropLocation> {
-    for dest_index in 0..ctx.table.cards_on_table.len() {
+    for table_slot_index in 0..ctx.table.cards_on_table.len() {
         // Table checks
         let (x1, y1, x2, y2) = get_card_hitbox_rect(
             TABLE_ORIGIN_X,
             TABLE_ORIGIN_Y,
             TABLE_CARD_X_SPACING,
-            dest_index,
+            table_slot_index,
         );
-        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
-            let destination = DragAndDropLocation::Table { index: dest_index };
 
-            if let DragAndDropLocation::Table { index: src_index } = source {
-                if dest_index == *src_index {
-                    continue;
-                }
-            }
+        let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Table { index } if *index == table_slot_index);
+        let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
 
-            return Some(destination);
+        if destination_is_source || hitbox_check_failed {
+            continue;
         }
+
+        return Some(DragAndDropLocation::Table {
+            index: table_slot_index,
+        });
     }
 
-    for dest_index in 0..ctx.hand.cards_in_hand.len() {
+    for hand_slot_index in 0..ctx.hand.cards_in_hand.len() {
         // Hand checks
         let (x1, y1, x2, y2) = get_card_hitbox_rect(
             HAND_ORIGIN_X,
             HAND_ORIGIN_Y,
             HAND_CARD_X_SPACING,
-            dest_index,
+            hand_slot_index,
         );
-        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
-            let destination = DragAndDropLocation::Hand { index: dest_index };
 
-            if let DragAndDropLocation::Hand { index: src_index } = source {
-                if dest_index == *src_index {
-                    continue;
-                }
-            }
+        let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Hand { index } if *index == hand_slot_index);
+        let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
 
-            return Some(destination);
+        if destination_is_source || hitbox_check_failed {
+            continue;
         }
+
+        return Some(DragAndDropLocation::Hand {
+            index: hand_slot_index,
+        });
     }
     None
 }
@@ -93,10 +93,10 @@ fn try_take_card_from(ctx: &mut Context, location: &DragAndDropLocation) -> Opti
 pub fn place_card_at(ctx: &mut Context, card: PlayingCard, location: &DragAndDropLocation) {
     match location {
         DragAndDropLocation::Hand { index } => {
-            ctx.hand.cards_in_hand[*index] = Some(CardInHand { card: card });
+            ctx.hand.cards_in_hand[*index] = Some(CardInHand { card });
         }
         DragAndDropLocation::Table { index } => {
-            ctx.table.cards_on_table[*index] = Some(CardOnTable { card: card });
+            ctx.table.cards_on_table[*index] = Some(CardOnTable { card });
         }
     }
 }

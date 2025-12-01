@@ -1,14 +1,14 @@
 use crossterm::style::{Attributes, Color, ContentStyle};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RGBA {
+pub struct Rgba {
     pub r: u8,
     pub g: u8,
     pub b: u8,
     pub a: f32,
 }
 
-impl RGBA {
+impl Rgba {
     pub fn from_f32(r: f32, g: f32, b: f32, a: f32) -> Self {
         Self {
             r: (r.clamp(0.0, 1.0) * 255.0) as u8,
@@ -28,9 +28,9 @@ impl RGBA {
     }
 }
 
-impl From<HSL> for RGBA {
-    fn from(hsl: HSL) -> Self {
-        let HSL { h, s, l, a } = hsl;
+impl From<Hsl> for Rgba {
+    fn from(hsl: Hsl) -> Self {
+        let Hsl { h, s, l, a } = hsl;
 
         let chroma = (1.0 - (2.0 * l - 1.0).abs()) * s;
         let hue_sector = h / 60.0;
@@ -38,16 +38,16 @@ impl From<HSL> for RGBA {
         let lightness_adjustment = l - chroma / 2.0;
 
         let (red_component, green_component, blue_component) = match hue_sector {
-            h if h >= 0.0 && h < 1.0 => (chroma, x, 0.0),
-            h if h >= 1.0 && h < 2.0 => (x, chroma, 0.0),
-            h if h >= 2.0 && h < 3.0 => (0.0, chroma, x),
-            h if h >= 3.0 && h < 4.0 => (0.0, x, chroma),
-            h if h >= 4.0 && h < 5.0 => (x, 0.0, chroma),
-            h if h >= 5.0 && h < 6.0 => (chroma, 0.0, x),
+            h if (0.0..1.0).contains(&h) => (chroma, x, 0.0),
+            h if (1.0..2.0).contains(&h) => (x, chroma, 0.0),
+            h if (2.0..3.0).contains(&h) => (0.0, chroma, x),
+            h if (3.0..4.0).contains(&h) => (0.0, x, chroma),
+            h if (4.0..5.0).contains(&h) => (x, 0.0, chroma),
+            h if (5.0..6.0).contains(&h) => (chroma, 0.0, x),
             _ => (0.0, 0.0, 0.0), // fallback for invalid hue
         };
 
-        RGBA {
+        Rgba {
             r: ((red_component + lightness_adjustment) * 255.0).round() as u8,
             g: ((green_component + lightness_adjustment) * 255.0).round() as u8,
             b: ((blue_component + lightness_adjustment) * 255.0).round() as u8,
@@ -58,7 +58,7 @@ impl From<HSL> for RGBA {
 
 /// Only use this for intermediate math, convert back to RGBA after you're done.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HSL {
+pub struct Hsl {
     pub h: f32,
     pub s: f32,
     pub l: f32,
@@ -66,9 +66,9 @@ pub struct HSL {
     pub a: f32,
 }
 
-impl From<RGBA> for HSL {
-    fn from(rgba: RGBA) -> Self {
-        let RGBA { r, g, b, a } = rgba;
+impl From<Rgba> for Hsl {
+    fn from(rgba: Rgba) -> Self {
+        let Rgba { r, g, b, a } = rgba;
 
         let red = r as f32 / 255.0;
         let green = g as f32 / 255.0;
@@ -101,7 +101,7 @@ impl From<RGBA> for HSL {
             delta / (1.0 - (2.0 * lightness - 1.0).abs())
         };
 
-        HSL {
+        Hsl {
             h: normalized_hue,
             s: saturation,
             l: lightness,
@@ -112,8 +112,8 @@ impl From<RGBA> for HSL {
 
 pub struct RichText {
     pub text: String,
-    pub fg: RGBA,
-    pub bg: RGBA,
+    pub fg: Rgba,
+    pub bg: Rgba,
     pub bold: bool,
 }
 
@@ -121,13 +121,13 @@ impl RichText {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            fg: RGBA {
+            fg: Rgba {
                 r: 255,
                 g: 255,
                 b: 255,
                 a: 1.0,
             },
-            bg: RGBA {
+            bg: Rgba {
                 r: 0,
                 g: 0,
                 b: 0,
@@ -137,12 +137,12 @@ impl RichText {
         }
     }
 
-    pub fn with_fg(mut self, fg: RGBA) -> Self {
+    pub fn with_fg(mut self, fg: Rgba) -> Self {
         self.fg = fg;
         self
     }
 
-    pub fn with_bg(mut self, bg: RGBA) -> Self {
+    pub fn with_bg(mut self, bg: Rgba) -> Self {
         self.bg = bg;
         self
     }
@@ -268,7 +268,7 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                 if skip_fg_blending {
                     cell.fg = rgba_to_packed_rgb(&new_rich_text.fg);
                 } else {
-                    let bottom_color: RGBA = if is_old_char_visible {
+                    let bottom_color: Rgba = if is_old_char_visible {
                         packed_rgb_to_rgba(cell.fg)
                     } else {
                         packed_rgb_to_rgba(cell.bg)
@@ -278,7 +278,7 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                 }
             } else if !skip_bg_blending {
                 // Special case for no new char but new blended bg => tint the old fgq
-                let old_fg: RGBA = packed_rgb_to_rgba(cell.fg);
+                let old_fg: Rgba = packed_rgb_to_rgba(cell.fg);
                 cell.fg = rgba_to_packed_rgb(&blend_source_over(&old_fg, &new_rich_text.bg))
             }
 
@@ -286,8 +286,8 @@ pub fn compose_buffer(buf: &mut ScreenBuffer, draw_calls: &[DrawCall]) {
                 if skip_bg_blending {
                     cell.bg = rgba_to_packed_rgb(&new_rich_text.bg);
                 } else {
-                    let old_bg: RGBA = packed_rgb_to_rgba(cell.bg);
-                    let blended_bg: RGBA = blend_source_over(&old_bg, &new_rich_text.bg);
+                    let old_bg: Rgba = packed_rgb_to_rgba(cell.bg);
+                    let blended_bg: Rgba = blend_source_over(&old_bg, &new_rich_text.bg);
                     cell.bg = rgba_to_packed_rgb(&blended_bg);
                 }
             }
@@ -306,8 +306,9 @@ pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: (u8, u8, u8)) {
     }
 }
 
-/// Helper for drawing rectangles
-pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16, color: RGBA) {
+/// Takes `i16` instead of `u16` for `x` and `y` to allow for
+/// correct clipping when the drawn element is partially off screen.
+pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16, color: Rgba) {
     for row_index in 0..h as i16 {
         let line_x: i16 = x.max(0);
         let line_y: i16 = y + row_index;
@@ -336,7 +337,7 @@ pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16,
             y: line_y as u16,
             rich_text: RichText::new(text_row)
                 // This ensures the old buf char is drawn
-                .with_fg(RGBA::from_u8(0, 0, 0, 0.0))
+                .with_fg(Rgba::from_u8(0, 0, 0, 0.0))
                 .with_bg(color),
         })
     }
@@ -344,34 +345,6 @@ pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16,
 
 fn pack_rgb(r: u8, g: u8, b: u8) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
-}
-
-pub fn build_vignette_lut(
-    width: usize,
-    height: usize,
-    radius_scale: f32,
-    falloff: f32,
-    strength: f32,
-) -> Vec<f32> {
-    let mut lut = Vec::with_capacity(width * height);
-    for y in 0..height {
-        for x in 0..width {
-            let nx = (2.0 * x as f32) / (width as f32 * 2.0) - 0.5;
-            let ny = (y as f32) / (height as f32) - 0.5;
-            let d = (nx * nx + ny * ny).sqrt();
-            let alpha = (d * radius_scale).powf(falloff).clamp(0.0, 1.0) * strength;
-            lut.push(alpha);
-        }
-    }
-    lut
-}
-
-pub fn build_gamma_lut(gamma: f32) -> [u8; 256] {
-    let mut lut = [0u8; 256];
-    for i in 0..256 {
-        lut[i] = ((i as f32 / 255.0).powf(gamma) * 255.0).round() as u8;
-    }
-    lut
 }
 
 fn unpack_rgb(packed: u32) -> (u8, u8, u8) {
@@ -382,24 +355,24 @@ fn unpack_rgb(packed: u32) -> (u8, u8, u8) {
     )
 }
 
-pub fn rgba_to_packed_rgb(rgba: &RGBA) -> u32 {
+pub fn rgba_to_packed_rgb(rgba: &Rgba) -> u32 {
     pack_rgb(rgba.r, rgba.g, rgba.b)
 }
 
-pub fn packed_rgb_to_rgba(packed_rgb: u32) -> RGBA {
+pub fn packed_rgb_to_rgba(packed_rgb: u32) -> Rgba {
     const ALPHA: f32 = 1.0;
     let (r, g, b) = unpack_rgb(packed_rgb);
-    RGBA::from_u8(r, g, b, ALPHA)
+    Rgba::from_u8(r, g, b, ALPHA)
 }
 
-pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
+pub fn blend_source_over(bottom: &Rgba, top: &Rgba) -> Rgba {
     let top_alpha = top.a.clamp(0.0, 1.0);
     let bottom_alpha = bottom.a.clamp(0.0, 1.0);
 
     let out_a = top_alpha + bottom_alpha * (1.0 - top_alpha);
 
     if out_a <= 0.0 {
-        return RGBA::from_u8(0, 0, 0, 0.0);
+        return Rgba::from_u8(0, 0, 0, 0.0);
     }
 
     let out_r = ((top.r as f32 / 255.0) * top_alpha
@@ -412,7 +385,7 @@ pub fn blend_source_over(bottom: &RGBA, top: &RGBA) -> RGBA {
         + (bottom.b as f32 / 255.0) * bottom_alpha * (1.0 - top_alpha))
         / out_a;
 
-    RGBA::from_f32(out_r, out_g, out_b, out_a)
+    Rgba::from_f32(out_r, out_g, out_b, out_a)
 }
 
 pub fn build_crossterm_content_style(cell: &Cell) -> ContentStyle {
@@ -444,11 +417,11 @@ pub fn build_crossterm_content_style(cell: &Cell) -> ContentStyle {
     }
 }
 
-pub fn lerp_rgba(a: &RGBA, b: &RGBA, t: f32) -> RGBA {
-    RGBA::from_f32(
-        a.r as f32 / 255.0 * (1.0 - t) + b.r as f32 / 255.0 * t,
-        a.g as f32 / 255.0 * (1.0 - t) + b.g as f32 / 255.0 * t,
-        a.b as f32 / 255.0 * (1.0 - t) + b.b as f32 / 255.0 * t,
-        a.a * (1.0 - t) + b.a * t,
-    )
-}
+// pub fn lerp_rgba(a: &Rgba, b: &Rgba, t: f32) -> Rgba {
+//     Rgba::from_f32(
+//         a.r as f32 / 255.0 * (1.0 - t) + b.r as f32 / 255.0 * t,
+//         a.g as f32 / 255.0 * (1.0 - t) + b.g as f32 / 255.0 * t,
+//         a.b as f32 / 255.0 * (1.0 - t) + b.b as f32 / 255.0 * t,
+//         a.a * (1.0 - t) + b.a * t,
+//     )
+// }

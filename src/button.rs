@@ -1,14 +1,14 @@
 use crate::{
     context::Context,
     dragged_card::CardDragState,
-    renderer::{DrawCall, HSL, RGBA, RichText, draw_rect, point_in_rect},
+    renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
 };
 
 pub struct Button {
     pub x: u16,
     pub y: u16,
     pub text: String,
-    pub color: RGBA,
+    pub color: Rgba,
     pub on_click: fn(&mut Context),
     pub enabled_when: fn(&Context) -> bool,
 }
@@ -36,24 +36,24 @@ pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Butto
         button.y as i16,
         w,
         h,
-        button_bg(ctx, &button),
+        button_bg(ctx, button),
     );
     draw_queue.push(DrawCall {
         x: button.x + 1,
         y: button.y,
         rich_text: RichText::new(&button.text)
-            .with_fg(RGBA::from_f32(0.0, 0.0, 0.0, 1.0))
+            .with_fg(Rgba::from_f32(0.0, 0.0, 0.0, 1.0))
             .with_bold(true),
     })
 }
 
-fn button_bg(ctx: &Context, button: &Button) -> RGBA {
+fn button_bg(ctx: &Context, button: &Button) -> Rgba {
     let w: u16 = (button.text.len() + 2) as u16;
     let h: u16 = 1;
     let button_x2: u16 = button.x + w - 1;
     let button_y2: u16 = button.y + h - 1;
 
-    let mut hsl: HSL = button.color.into();
+    let mut hsl: Hsl = button.color.into();
 
     let is_hovered: bool = point_in_rect(
         ctx.mouse.x,

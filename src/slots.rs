@@ -1,11 +1,11 @@
 use crate::{
-    constants::SLOTS_COLUMNS_X_SPACING,
+    constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_NEIGHBOR_ROW_COUNT},
     playing_card::{PlayingCard, draw_calls_playing_card_small},
-    renderer::{DrawCall, HSL},
+    renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
 };
 
 pub struct Slots {
-    pub spin_count: u32,
+    // pub spin_count: u32,
     pub columns: Vec<Column>,
 }
 
@@ -85,6 +85,63 @@ pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
     }
 }
 
+pub fn slots_are_spinning(slots: &Slots) -> bool {
+    slots.columns.iter().all(|column| column.spin_speed == 0.0)
+}
+
+/// Slot columns are supposed to be drawn on top of this.
+pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, h: u16) {
+    // Midpart
+    let midpart_y: u16 = y + 1;
+    for slots_row_index in 0..midpart_y + h {
+        let center_row = h / 2 + 1;
+        // let center_row = h / 2;
+        let distance: f32 = (slots_row_index as i16 - center_row as i16).abs() as f32;
+        let max_distance: f32 = center_row as f32;
+
+        let scale: f32 = 1.0 - (distance / max_distance) * 0.3;
+
+        let mut bg_hsl: Hsl = Rgba::from_u8(255, 215, 0, 1.0).into();
+        bg_hsl.l *= scale;
+        bg_hsl.h += -36.0;
+        bg_hsl.l *= 0.25;
+        bg_hsl.s *= 0.4;
+
+        let fg: Rgba = Rgba::from_u8(0, 0, 0, 1.0);
+        let bg: Rgba = bg_hsl.into();
+
+        draw_queue.push(DrawCall {
+            x,
+            y: y + slots_row_index,
+            rich_text: RichText::new(" ".repeat(w.into())).with_fg(fg).with_bg(bg),
+        });
+    }
+
+    // Top & bottom borders
+    let half_width: i16 = (w / 2) as i16;
+    for y in [1, 9] {
+        for x in 0..w as i16 {
+            draw_rect(draw_queue, x, y, 1, 1, {
+                let mut hsl: Hsl = Rgba::from_u8(176, 144, 61, 1.0).into();
+                let distance_from_center: i16 = (x - half_width).abs();
+                hsl.l *= 0.6 + 0.03 * (half_width - distance_from_center) as f32;
+                hsl.s *= 0.8;
+                hsl.into()
+            });
+        }
+    }
+
+    // Under-panel shadow
+    draw_rect(
+        draw_queue,
+        0,
+        (y + h + 2) as i16,
+        w,
+        1,
+        Rgba::from_u8(0, 0, 0, 0.1),
+    );
+}
+
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots) {
     for (col_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = col_index as u16;
@@ -102,13 +159,15 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
         let wrapped_index: i16 = index.rem_euclid(cards_len);
         wrapped_index as usize
     }
+    // let min_row_offset: i16 = - i16(SLOTS_NEIGHBOR_ROW_COUNT / 2) as i16;
+    // let max_row_offset: i16 = ((SLOTS_NEIGHBOR_ROW_COUNT / 2) as i16);
 
-    for row_offset in -3..4 as i16 {
+    for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_card_index(row_offset, column);
         let card: &PlayingCard = &column.cards[card_index];
 
-        // Y is casted to ensure the subtraction is done on a signed int
-        // as card_y is never supposed to be in the negatives
+        // If `y` is ever negative, the slots are drawn too high up, in which case that's a developer mistake.
+        // `debug_assert!` is fine here as the code should never ship with the described case.
         let card_y_signed: i16 = y as i16 + row_offset;
         debug_assert!(
             card_y_signed >= 0,
@@ -124,8 +183,8 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
         let mut card_draw_call: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
 
         if row_offset != 0 {
-            let mut fg_hsl: HSL = card_draw_call.rich_text.fg.into();
-            let mut bg_hsl: HSL = card_draw_call.rich_text.bg.into();
+            let mut fg_hsl: Hsl = card_draw_call.rich_text.fg.into();
+            let mut bg_hsl: Hsl = card_draw_call.rich_text.bg.into();
 
             let sigma: f32 = 1.5;
             let gaussian_factor: f32 = (-(row_offset.pow(2) as f32) / (2.0 * sigma.powi(2))).exp();
@@ -138,8 +197,4 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
 
         draw_queue.push(card_draw_call);
     }
-}
-
-pub fn slots_stopped(slots: &Slots) -> bool {
-    slots.columns.iter().all(|column| column.spin_speed == 0.0)
 }

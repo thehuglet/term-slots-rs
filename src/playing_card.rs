@@ -1,10 +1,10 @@
 use crate::{
-    constants::{DEFAULT_CARD_BG_COLOR, SUIT_COLOR_BLACK, SUIT_COLOR_RED},
-    renderer::{DrawCall, RGBA, RichText},
+    constants::{
+        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, DEFAULT_CARD_BG_COLOR, SUIT_COLOR_BLACK,
+        SUIT_COLOR_RED,
+    },
+    renderer::{DrawCall, Rgba, RichText},
 };
-
-pub const BIG_CARD_WIDTH: u16 = 3;
-pub const BIG_CARD_HEIGHT: u16 = 3;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Suit {
@@ -24,7 +24,7 @@ impl Suit {
         }
     }
 
-    pub fn color(&self) -> RGBA {
+    pub fn color(&self) -> Rgba {
         match self {
             Suit::Spade => SUIT_COLOR_BLACK,
             Suit::Heart => SUIT_COLOR_RED,
@@ -103,14 +103,14 @@ pub struct PlayingCard {
 pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &PlayingCard) -> DrawCall {
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
-    let suit_color: RGBA = card.suit.color();
-    let bg_color: RGBA = DEFAULT_CARD_BG_COLOR;
+    let suit_color: Rgba = card.suit.color();
+    let bg_color: Rgba = DEFAULT_CARD_BG_COLOR;
 
     let text: String = format!("{suit}{rank:>2}", suit = suit_repr, rank = rank_repr);
 
     DrawCall {
-        x: x,
-        y: y,
+        x,
+        y,
         rich_text: RichText::new(text)
             .with_fg(suit_color)
             .with_bg(bg_color)
@@ -123,8 +123,8 @@ pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &PlayingCard) -> Vec<Dr
 
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
-    let suit_color: RGBA = card.suit.color();
-    let bg_color: RGBA = DEFAULT_CARD_BG_COLOR;
+    let suit_color: Rgba = card.suit.color();
+    let bg_color: Rgba = DEFAULT_CARD_BG_COLOR;
 
     // Choose pattern based on rank
     let pattern: [&str; 3] = match card.rank {
@@ -197,7 +197,13 @@ pub fn get_card_hitbox_rect(
 ) -> (u16, u16, u16, u16) {
     let x1: u16 = origin_x + index as u16 * spacing;
     let y1: u16 = origin_y;
-    let x2: u16 = x1 + BIG_CARD_WIDTH - 1;
-    let y2: u16 = y1 + BIG_CARD_HEIGHT - 1;
+    let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+    let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
     (x1, y1, x2, y2)
+}
+
+pub fn standard_52_deck() -> Vec<PlayingCard> {
+    Suit::iter()
+        .flat_map(|suit| Rank::iter().map(move |rank| PlayingCard { suit, rank }))
+        .collect()
 }

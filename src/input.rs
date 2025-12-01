@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, MouseButton, MouseEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEventKind};
 
 use crate::{
     button::{Button, get_button_at},
@@ -30,12 +30,24 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
             // Recreate screen on resize to avoid graphical anomalies
             ctx.screen = Screen::new(TERM_SCREEN_WIDTH, TERM_SCREEN_HEIGHT, (0, 0, 0));
         }
-        Event::Key(KeyEvent { code: key_code, .. }) => match key_code {
-            KeyCode::Char('q') => return ProgramStatus::Exit,
-            KeyCode::Char('v') => ctx.vignette = !ctx.vignette,
-            KeyCode::Char('g') => ctx.gamma_correction = !ctx.gamma_correction,
-            _ => {}
-        },
+        Event::Key(KeyEvent {
+            code: key_code,
+            kind: key_kind,
+            ..
+        }) => {
+            if key_kind == KeyEventKind::Press {
+                match key_code {
+                    KeyCode::Char('q') => return ProgramStatus::Exit,
+                    KeyCode::Char('v') => {
+                        ctx.settings.vignette_enabled = !ctx.settings.vignette_enabled
+                    }
+                    KeyCode::Char('b') => {
+                        ctx.settings.bg_shader_enabled = !ctx.settings.bg_shader_enabled
+                    }
+                    _ => {}
+                }
+            }
+        }
         Event::Mouse(mouse_event) => match mouse_event.kind {
             MouseEventKind::Down(MouseButton::Left) => on_left_click_down(ctx),
             MouseEventKind::Up(MouseButton::Left) => on_left_click_up(ctx, buttons),
@@ -86,7 +98,7 @@ fn on_left_click_down(ctx: &mut Context) {
         if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: card_on_table.card.clone(),
-                source: DragAndDropLocation::Table { index: index },
+                source: DragAndDropLocation::Table { index },
             };
         }
     }
@@ -95,24 +107,31 @@ fn on_left_click_down(ctx: &mut Context) {
 fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
     ctx.mouse.is_left_down = false;
 
-    // Run click callbacks on buttons if not dragging
-    if matches!(ctx.mouse.card_drag, CardDragState::NotDragging) {
-        if let Some(button) = get_button_at(&buttons, ctx.mouse.x, ctx.mouse.y) {
-            (button.on_click)(ctx);
-        }
+    // button clicks
+    let drag_state: CardDragState =
+        std::mem::replace(&mut ctx.mouse.card_drag, CardDragState::NotDragging);
+    let not_dragging: bool = matches!(drag_state, CardDragState::NotDragging);
+    let maybe_button: Option<&Button> = get_button_at(buttons, ctx.mouse.x, ctx.mouse.y);
+
+    if not_dragging && let Some(button) = maybe_button {
+        (button.on_click)(ctx);
     }
 
-    // Drop logic
-    let drag_state = std::mem::replace(&mut ctx.mouse.card_drag, CardDragState::NotDragging);
+    // dropping (drag & drop)
+    let maybe_drag_data: Option<(crate::playing_card::PlayingCard, DragAndDropLocation)> =
+        match drag_state {
+            CardDragState::Dragging { card, source } => Some((card, source)),
+            _ => None,
+        };
 
-    if let CardDragState::Dragging { card, source } = drag_state {
-        if let Some(destination) = get_valid_drop_destination(ctx, &source) {
-            if location_has_card(ctx, &destination) {
-                swap_cards_at(ctx, &source, &destination);
-            } else {
-                place_card_at(ctx, card, &destination);
-                delete_card_at(ctx, &source);
-            }
+    if let Some((card, source)) = maybe_drag_data
+        && let Some(destination) = get_valid_drop_destination(ctx, &source)
+    {
+        if location_has_card(ctx, &destination) {
+            swap_cards_at(ctx, &source, &destination);
+        } else {
+            place_card_at(ctx, card, &destination);
+            delete_card_at(ctx, &source);
         }
     }
 }
