@@ -1,9 +1,12 @@
 use crate::{
-    constants::HAND_CARD_X_SPACING,
+    constants::{
+        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, HAND_CARD_X_SPACING,
+        HAND_SLOT_COUNT,
+    },
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation, dragged_source_vfx_sinewave},
     playing_card::{PlayingCard, draw_calls_playing_card_big},
-    renderer::{DrawCall, Hsl},
+    renderer::{DrawCall, Hsl, draw_rect},
     utils::iter_some,
 };
 
@@ -17,7 +20,7 @@ pub struct CardInHand {
     pub card: PlayingCard,
 }
 
-pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, ctx: &Context, x: u16, y: u16) {
+pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
     for (index, card_in_hand) in iter_some(&ctx.hand.cards_in_hand) {
         let n: u16 = index as u16;
         let card_x: u16 = x + n * HAND_CARD_X_SPACING;
@@ -50,5 +53,18 @@ pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, ctx: &Context, x: u16, y: u16) 
         }
 
         draw_queue.extend(draw_calls)
+    }
+}
+
+pub fn draw_hand_card_slot(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
+    for n in 0..HAND_SLOT_COUNT as u16 {
+        draw_rect(
+            draw_queue,
+            (x + n * HAND_CARD_X_SPACING) as i16,
+            y as i16,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+            CARD_SLOT_COLOR,
+        );
     }
 }

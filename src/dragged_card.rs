@@ -1,12 +1,12 @@
 use crate::{
     constants::{
-        HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X,
-        TABLE_ORIGIN_Y,
+        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
+        HAND_ORIGIN_Y, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
     },
     context::Context,
     hand::CardInHand,
-    playing_card::{PlayingCard, get_card_hitbox_rect},
-    renderer::point_in_rect,
+    playing_card::{PlayingCard, draw_calls_playing_card_big, get_card_hitbox_rect},
+    renderer::{DrawCall, Rgba, draw_rect, point_in_rect},
     table::CardOnTable,
 };
 
@@ -77,19 +77,6 @@ pub fn get_valid_drop_destination(
     None
 }
 
-fn try_take_card_from(ctx: &mut Context, location: &DragAndDropLocation) -> Option<PlayingCard> {
-    match location {
-        DragAndDropLocation::Hand { index } => {
-            // Take the card from hand slot, extract the PlayingCard inside
-            ctx.hand.cards_in_hand[*index].take().map(|c| c.card)
-        }
-        DragAndDropLocation::Table { index } => {
-            // Take the card from table slot, extract the PlayingCard inside
-            ctx.table.cards_on_table[*index].take().map(|c| c.card)
-        }
-    }
-}
-
 pub fn place_card_at(ctx: &mut Context, card: PlayingCard, location: &DragAndDropLocation) {
     match location {
         DragAndDropLocation::Hand { index } => {
@@ -132,4 +119,35 @@ pub fn swap_cards_at(
 
     place_card_at(ctx, card_from_location_a, location_b);
     place_card_at(ctx, card_from_location_b, location_a);
+}
+
+pub fn draw_dragged_card(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, card: &PlayingCard) {
+    let anchor_x: i16 = x as i16 - 1;
+    let anchor_y: i16 = y as i16 - 2;
+
+    // Shadow
+    draw_rect(
+        draw_queue,
+        anchor_x - 1,
+        anchor_y + 1,
+        BIG_PLAYING_CARD_WIDTH,
+        BIG_PLAYING_CARD_HEIGHT,
+        Rgba::from_f32(0.0, 0.0, 0.0, 0.13),
+    );
+
+    // Card
+    draw_queue.extend(draw_calls_playing_card_big(anchor_x, anchor_y, card));
+}
+
+fn try_take_card_from(ctx: &mut Context, location: &DragAndDropLocation) -> Option<PlayingCard> {
+    match location {
+        DragAndDropLocation::Hand { index } => {
+            // Take the card from hand slot, extract the PlayingCard inside
+            ctx.hand.cards_in_hand[*index].take().map(|c| c.card)
+        }
+        DragAndDropLocation::Table { index } => {
+            // Take the card from table slot, extract the PlayingCard inside
+            ctx.table.cards_on_table[*index].take().map(|c| c.card)
+        }
+    }
 }

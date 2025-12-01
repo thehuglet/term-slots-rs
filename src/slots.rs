@@ -1,5 +1,5 @@
 use crate::{
-    constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_NEIGHBOR_ROW_COUNT},
+    constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
     playing_card::{PlayingCard, draw_calls_playing_card_small},
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
 };
@@ -124,7 +124,7 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
             draw_rect(draw_queue, x, y, 1, 1, {
                 let mut hsl: Hsl = Rgba::from_u8(176, 144, 61, 1.0).into();
                 let distance_from_center: i16 = (x - half_width).abs();
-                hsl.l *= 0.6 + 0.03 * (half_width - distance_from_center) as f32;
+                hsl.l *= 0.6 + 0.035 * (half_width - distance_from_center) as f32;
                 hsl.s *= 0.8;
                 hsl.into()
             });
@@ -159,8 +159,6 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
         let wrapped_index: i16 = index.rem_euclid(cards_len);
         wrapped_index as usize
     }
-    // let min_row_offset: i16 = - i16(SLOTS_NEIGHBOR_ROW_COUNT / 2) as i16;
-    // let max_row_offset: i16 = ((SLOTS_NEIGHBOR_ROW_COUNT / 2) as i16);
 
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_card_index(row_offset, column);
@@ -196,5 +194,15 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
         }
 
         draw_queue.push(card_draw_call);
+    }
+}
+
+pub fn draw_slots_column_shadows(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
+    for column_index in 0..SLOTS_MAX_COLUMN_COUNT {
+        let x: i16 = (x + column_index * SLOTS_COLUMNS_X_SPACING) as i16;
+        let y: i16 = (y - 3) as i16;
+        let shadow_color: Rgba = Rgba::from_u8(0, 0, 0, 0.1);
+
+        draw_rect(draw_queue, x + 2, y, 1, 6, shadow_color)
     }
 }

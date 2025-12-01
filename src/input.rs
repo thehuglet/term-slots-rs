@@ -107,7 +107,7 @@ fn on_left_click_down(ctx: &mut Context) {
 fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
     ctx.mouse.is_left_down = false;
 
-    // button clicks
+    // Button clicks
     let drag_state: CardDragState =
         std::mem::replace(&mut ctx.mouse.card_drag, CardDragState::NotDragging);
     let not_dragging: bool = matches!(drag_state, CardDragState::NotDragging);
@@ -117,7 +117,7 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
         (button.on_click)(ctx);
     }
 
-    // dropping (drag & drop)
+    // Dropping (drag & drop)
     let maybe_drag_data: Option<(crate::playing_card::PlayingCard, DragAndDropLocation)> =
         match drag_state {
             CardDragState::Dragging { card, source } => Some((card, source)),

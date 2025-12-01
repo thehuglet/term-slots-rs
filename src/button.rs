@@ -1,3 +1,5 @@
+use unicode_width::UnicodeWidthStr;
+
 use crate::{
     context::Context,
     dragged_card::CardDragState,
@@ -7,6 +9,7 @@ use crate::{
 pub struct Button {
     pub x: u16,
     pub y: u16,
+    pub w: u16,
     pub text: String,
     pub color: Rgba,
     pub on_click: fn(&mut Context),
@@ -15,7 +18,7 @@ pub struct Button {
 
 pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
     for button in buttons {
-        let button_x2: u16 = button.x + button.text.len() as u16 + 1;
+        let button_x2: u16 = button.x + button.w - 1;
         let button_y2: u16 = button.y;
 
         if point_in_rect(x, y, button.x, button.y, button_x2, button_y2) {
@@ -27,7 +30,7 @@ pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
 }
 
 pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Button) {
-    let w: u16 = (button.text.len() + 2) as u16;
+    let w: u16 = button.w;
     let h: u16 = 1;
 
     draw_rect(
@@ -36,20 +39,29 @@ pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Butto
         button.y as i16,
         w,
         h,
-        button_bg(ctx, button),
+        button_bg(ctx, button, w, h),
     );
+
+    // measure the display width
+    let text_w: u16 = UnicodeWidthStr::width(button.text.as_str()) as u16;
+
+    // center inside the button
+    // leave 1-char padding if you want, or remove it entirely
+    let inner_w = w.saturating_sub(2);
+    let offset = (inner_w.saturating_sub(text_w)) / 2;
+
+    let draw_x = button.x + 1 + offset;
+
     draw_queue.push(DrawCall {
-        x: button.x + 1,
+        x: draw_x,
         y: button.y,
         rich_text: RichText::new(&button.text)
             .with_fg(Rgba::from_f32(0.0, 0.0, 0.0, 1.0))
             .with_bold(true),
-    })
+    });
 }
 
-fn button_bg(ctx: &Context, button: &Button) -> Rgba {
-    let w: u16 = (button.text.len() + 2) as u16;
-    let h: u16 = 1;
+fn button_bg(ctx: &Context, button: &Button, w: u16, h: u16) -> Rgba {
     let button_x2: u16 = button.x + w - 1;
     let button_y2: u16 = button.y + h - 1;
 

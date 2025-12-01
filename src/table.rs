@@ -1,9 +1,12 @@
 use crate::{
-    constants::TABLE_CARD_X_SPACING,
+    constants::{
+        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, TABLE_CARD_X_SPACING,
+        TABLE_SLOT_COUNT,
+    },
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation, dragged_source_vfx_sinewave},
     playing_card::{PlayingCard, draw_calls_playing_card_big},
-    renderer::{DrawCall, Hsl},
+    renderer::{DrawCall, Hsl, draw_rect},
     utils::iter_some,
 };
 
@@ -16,7 +19,7 @@ pub struct CardOnTable {
     pub card: PlayingCard,
 }
 
-pub fn draw_table(draw_queue: &mut Vec<DrawCall>, ctx: &Context, x: u16, y: u16) {
+pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
     for (index, card_on_table) in iter_some(&ctx.table.cards_on_table) {
         let card: &PlayingCard = &card_on_table.card;
 
@@ -51,5 +54,18 @@ pub fn draw_table(draw_queue: &mut Vec<DrawCall>, ctx: &Context, x: u16, y: u16)
         }
 
         draw_queue.extend(draw_calls)
+    }
+}
+
+pub fn draw_table_card_slot(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
+    for n in 0..TABLE_SLOT_COUNT as u16 {
+        draw_rect(
+            draw_queue,
+            (x + n * TABLE_CARD_X_SPACING) as i16,
+            y as i16,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+            CARD_SLOT_COLOR,
+        );
     }
 }

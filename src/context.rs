@@ -1,5 +1,5 @@
 use crate::{
-    constants::{MAX_SLOTS_COLUMNS, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH},
+    constants::{SLOTS_MAX_COLUMN_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH},
     dragged_card::CardDragState,
     fps_counter::FPSCounter,
     hand::Hand,
@@ -30,7 +30,7 @@ impl Default for Context {
                 bg_shader_enabled: true,
             },
             luts: LookUpTables {
-                gamma: build_gamma_lut(0.8),
+                gamma: build_gamma_lut(0.75),
                 vignette: build_vignette_lut(
                     TERM_SCREEN_WIDTH as usize,
                     TERM_SCREEN_HEIGHT as usize,
@@ -56,7 +56,7 @@ impl Default for Context {
                         spin_time_remaining: 0.0,
                         spin_speed: 0.0,
                     };
-                    MAX_SLOTS_COLUMNS as usize
+                    SLOTS_MAX_COLUMN_COUNT as usize
                 ],
             },
             table: Table {
