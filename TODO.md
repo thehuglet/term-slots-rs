@@ -1,0 +1,3 @@
+- [ ] Implement column reward picking post spin
+- [ ] Make column reward picking intuitive to interact with
+- [ ] Put table cards back into hand on spin & lock table slots (maybe useful unicode character: 🔒︎)

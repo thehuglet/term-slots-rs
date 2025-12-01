@@ -1,10 +1,12 @@
 use crate::{
     constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
+    context::Context,
     playing_card::{PlayingCard, draw_calls_playing_card_small},
-    renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
+    renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
 };
 
 pub struct Slots {
+    // pub slots_state:
     // pub spin_count: u32,
     pub columns: Vec<Column>,
 }
@@ -142,17 +144,17 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
     );
 }
 
-pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots) {
+pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
     for (col_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = col_index as u16;
         let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;
 
-        draw_column(draw_queue, column_x, column_y, column);
+        draw_column(draw_queue, column_x, column_y, column, ctx);
     }
 }
 
-fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) {
+fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column, ctx: &Context) {
     fn get_card_index(row_offset: i16, column: &Column) -> usize {
         let cards_len: i16 = column.cards.len() as i16;
         let index: i16 = column.cursor as i16 + row_offset;
@@ -179,19 +181,27 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column) 
         let card_y: u16 = card_y_signed as u16;
 
         let mut card_draw_call: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
+        let mut fg_hsl: Hsl = card_draw_call.rich_text.fg.into();
+        let mut bg_hsl: Hsl = card_draw_call.rich_text.bg.into();
 
-        if row_offset != 0 {
-            let mut fg_hsl: Hsl = card_draw_call.rich_text.fg.into();
-            let mut bg_hsl: Hsl = card_draw_call.rich_text.bg.into();
+        if row_offset == 0 {
+            // Mouse hover experiment
+            let mouse_is_hovering: bool =
+                point_in_rect(ctx.mouse.x, ctx.mouse.y, card_x, card_y, card_x + 3, card_y);
 
+            if mouse_is_hovering {
+                fg_hsl.l *= 0.1;
+                bg_hsl.l *= 0.1;
+            }
+        } else {
             let sigma: f32 = 1.5;
             let gaussian_factor: f32 = (-(row_offset.pow(2) as f32) / (2.0 * sigma.powi(2))).exp();
             fg_hsl.l *= gaussian_factor * 0.7;
             bg_hsl.l *= gaussian_factor * 0.7;
-
-            card_draw_call.rich_text.fg = fg_hsl.into();
-            card_draw_call.rich_text.bg = bg_hsl.into();
         }
+
+        card_draw_call.rich_text.fg = fg_hsl.into();
+        card_draw_call.rich_text.bg = bg_hsl.into();
 
         draw_queue.push(card_draw_call);
     }

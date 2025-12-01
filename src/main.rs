@@ -190,7 +190,13 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     draw_slots_panel(&mut draw_queue, 0, 1, 37, 7);
-    draw_slots(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, &ctx.slots);
+    draw_slots(
+        &mut draw_queue,
+        SLOTS_ORIGIN_X,
+        SLOTS_ORIGIN_Y,
+        &ctx.slots,
+        &ctx,
+    );
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
 
     draw_table_card_slot(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y);
@@ -243,7 +249,7 @@ fn draw_sidebar_border(draw_queue: &mut Vec<DrawCall>, x: u16) {
     for y in 0..TERM_SCREEN_HEIGHT as i16 {
         draw_rect(draw_queue, x as i16, y, 1, TERM_SCREEN_HEIGHT, {
             let mut hsl: Hsl = Rgba::from_u8(176, 144, 61, 1.0).into();
-            let distance_from_center: i16 = (y - half_height).abs();
+            let distance_from_center: i16 = (y - half_height + 1).abs();
             hsl.l *= 0.6 + 0.045 * (half_height - distance_from_center) as f32;
             hsl.s *= 0.8;
             hsl.into()
