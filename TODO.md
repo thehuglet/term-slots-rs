@@ -1,3 +1,0 @@
-- [x] Implement column reward picking post spin
-- [x] Make column reward picking intuitive to interact with
-- [x] Implement fast table-hand moving with RMB

@@ -27,7 +27,7 @@ impl Rgba {
         }
     }
 
-    pub fn lerp(self, other: Rgba, t: f32) -> Rgba {
+    pub fn lerp(&self, other: Rgba, t: f32) -> Rgba {
         Rgba::from_f32(
             self.r as f32 / 255.0 * (1.0 - t) + other.r as f32 / 255.0 * t,
             self.g as f32 / 255.0 * (1.0 - t) + other.g as f32 / 255.0 * t,

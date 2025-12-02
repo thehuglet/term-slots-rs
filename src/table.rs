@@ -6,12 +6,14 @@ use crate::{
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation},
     playing_card::{PlayingCard, draw_calls_playing_card_big},
+    poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
     slots::SlotsState,
     utils::iter_some,
 };
 
 pub struct Table {
+    pub poker_hand: Option<PokerHand>,
     pub cards_on_table: Vec<Option<CardOnTable>>,
 }
 

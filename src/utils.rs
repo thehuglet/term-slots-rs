@@ -29,3 +29,22 @@ pub fn iter_some_mut<T>(vec: &mut [Option<T>]) -> impl Iterator<Item = (usize, &
         .enumerate()
         .filter_map(|(i, maybe)| maybe.as_ref().map(|item| (i, item)))
 }
+
+pub fn center_text_unicode(text: String, width: usize) -> String {
+    use unicode_width::UnicodeWidthStr;
+
+    let text_width = text.width();
+    if text_width >= width {
+        return text.to_string();
+    }
+
+    let left_padding = (width - text_width) / 2;
+    let right_padding = width - text_width - left_padding;
+
+    format!(
+        "{}{}{}",
+        " ".repeat(left_padding),
+        text,
+        " ".repeat(right_padding)
+    )
+}

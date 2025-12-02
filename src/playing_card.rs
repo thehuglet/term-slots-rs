@@ -6,7 +6,7 @@ use crate::{
     renderer::{DrawCall, Rgba, RichText},
 };
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Suit {
     Spade,
     Heart,
@@ -38,7 +38,7 @@ impl Suit {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Rank {
     Ace,
     King,
@@ -74,6 +74,24 @@ impl Rank {
         }
     }
 
+    pub fn coin_value(&self) -> u16 {
+        match self {
+            Rank::Ace => 11,
+            Rank::King => 10,
+            Rank::Queen => 10,
+            Rank::Jack => 10,
+            Rank::Num10 => 10,
+            Rank::Num9 => 9,
+            Rank::Num8 => 8,
+            Rank::Num7 => 7,
+            Rank::Num6 => 6,
+            Rank::Num5 => 5,
+            Rank::Num4 => 4,
+            Rank::Num3 => 3,
+            Rank::Num2 => 2,
+        }
+    }
+
     pub fn iter() -> std::array::IntoIter<Rank, 13> {
         [
             Rank::Ace,
@@ -94,7 +112,7 @@ impl Rank {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct PlayingCard {
     pub suit: Suit,
     pub rank: Rank,

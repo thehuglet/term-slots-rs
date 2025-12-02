@@ -15,6 +15,7 @@ use crate::{
         location_has_card, place_card_at, swap_cards_at,
     },
     hand::CardInHand,
+    poker_hand::update_current_poker_hand,
     renderer::{Screen, point_in_rect},
     table::CardOnTable,
     utils::iter_some,
@@ -188,6 +189,8 @@ fn on_right_click_down(ctx: &mut Context) {
                 card: card_container.card,
             });
 
+            update_current_poker_hand(ctx);
+
             // Table card moved to hand, can skip rest of loop
             return;
         }
@@ -232,8 +235,11 @@ fn on_right_click_down(ctx: &mut Context) {
                 card: card_container.card,
             });
 
+            update_current_poker_hand(ctx);
+
             // Hand card moved to table, can skip rest of loop
             return;
         }
     }
+    update_current_poker_hand(ctx);
 }

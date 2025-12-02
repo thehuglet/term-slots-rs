@@ -87,7 +87,7 @@ pub fn draw_bg_shader(
 
             let cell_x: u16 = x / 2;
             let cell_y: u16 = y;
-            let is_checker = (cell_x + cell_y) % 2 == 0;
+            let is_checker: bool = (cell_x + cell_y) % 2 == 0;
 
             let offset: f32 = (cell_x as f32 / 8.0) + (cell_y as f32 / 4.0);
             let phase: f32 =

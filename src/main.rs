@@ -7,6 +7,7 @@ mod fps_limiter;
 mod hand;
 mod input;
 mod playing_card;
+mod poker_hand;
 mod renderer;
 mod shader;
 mod slots;
@@ -40,6 +41,7 @@ use crate::{
     hand::{CardInHand, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
     playing_card::{PlayingCard, Rank, Suit},
+    poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
     renderer::{
         Cell, DrawCall, Hsl, Rgba, RichText, build_crossterm_content_style, compose_buffer,
         diff_buffers, draw_rect, fill_screen_background,
@@ -50,6 +52,7 @@ use crate::{
         draw_slots_panel, get_column_card_index, slots_are_spinning, spin_cost, spin_slots_column,
     },
     table::{draw_table, draw_table_card_slots},
+    utils::center_text_unicode,
 };
 
 fn main() -> io::Result<()> {
@@ -84,13 +87,13 @@ fn main() -> io::Result<()> {
     ctx.hand.cards_in_hand[0] = Some(CardInHand {
         card: PlayingCard {
             suit: Suit::Heart,
-            rank: Rank::Num3,
+            rank: Rank::Ace,
         },
     });
     ctx.hand.cards_in_hand[2] = Some(CardInHand {
         card: PlayingCard {
             suit: Suit::Spade,
-            rank: Rank::Num10,
+            rank: Rank::Ace,
         },
     });
     ctx.hand.cards_in_hand[5] = Some(CardInHand {
@@ -167,7 +170,33 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         w: 12,
         text: "PLAY".to_string(),
         color: Rgba::from_u8(160, 210, 140, 1.0),
-        on_click: Box::new(move |ctx: &mut Context| {}),
+        on_click: Box::new(move |ctx: &mut Context| {
+            let table_cards: Vec<PlayingCard> = ctx
+                .table
+                .cards_on_table
+                .iter()
+                .filter_map(|slot| {
+                    slot.as_ref()
+                        .map(|card_on_table| card_on_table.card.clone())
+                })
+                .collect();
+
+            let (poker_hand, scoring_cards): (PokerHand, Vec<PlayingCard>) =
+                eval_poker_hand(&table_cards);
+
+            let mut coins_reward_total: u16 = poker_hand.coin_value() as u16;
+
+            // Base score of each card
+            for rank in scoring_cards.iter().map(|card| card.rank) {
+                coins_reward_total += rank.coin_value()
+            }
+
+            ctx.coins += coins_reward_total as i32;
+
+            // Clear hand
+            ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            update_current_poker_hand(ctx);
+        }),
         enabled_when: |ctx| {
             let cards_on_table_count = ctx
                 .table
@@ -186,9 +215,10 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         y: 16,
         w: 12,
         text: "BURN".to_string(),
-        color: Rgba::from_u8(255, 70, 90, 1.0),
+        color: Rgba::from_u8(255, 120, 80, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
             ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            update_current_poker_hand(ctx);
         }),
         enabled_when: |ctx| {
             let cards_on_table_count = ctx
@@ -328,20 +358,53 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     // Coin drawing
     draw_queue.push(DrawCall {
         x: SIDEBAR_BORDER_X + 3,
-        y: 4,
-        rich_text: RichText::new(format!("{:>12}", format!("${}", ctx.coins)))
-            .with_fg(Rgba::from_u8(255, 255, 180, 1.0))
+        y: 5,
+        rich_text: RichText::new(format!("{:>12}", format!("$ {}", ctx.coins)))
+            .with_fg(Rgba::from_u8(255, 255, 155, 1.0))
             .with_bold(true),
     });
+
+    // Diamonds drawing
+    draw_queue.push(DrawCall {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 6,
+        rich_text: RichText::new(format!("{:>12}", format!("☘ {}", ctx.luck)))
+            .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
+            .with_bold(true),
+    });
+
+    // Poker hand preview
+    if let Some(poker_hand) = ctx.table.poker_hand {
+        let text_centered: String = if matches!(poker_hand, PokerHand::HighCard) {
+            center_text_unicode(
+                format!("{poker_hand}", poker_hand = poker_hand.repr(),),
+                SIDEBAR_BORDER_X as usize,
+            )
+        } else {
+            center_text_unicode(
+                format!(
+                    "{poker_hand} (+{bonus_coins})",
+                    poker_hand = poker_hand.repr(),
+                    bonus_coins = poker_hand.coin_value(),
+                ),
+                SIDEBAR_BORDER_X as usize,
+            )
+        };
+
+        draw_queue.push(DrawCall {
+            x: 0,
+            y: 18,
+            rich_text: RichText::new(text_centered).with_bold(true),
+        });
+    }
 
     for button in &mut buttons {
         draw_button(&mut draw_queue, ctx, button)
     }
 
     // draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
-
-    if let CardDragState::Dragging { card, .. } = &ctx.mouse.card_drag {
-        draw_dragged_card(&mut draw_queue, ctx.mouse.x, ctx.mouse.y, card);
+    if let CardDragState::Dragging { card, .. } = ctx.mouse.card_drag.clone() {
+        draw_dragged_card(&mut draw_queue, &card, ctx);
     }
 
     // --- Renderer boilerplate ---

@@ -12,6 +12,7 @@ use crate::{
 
 pub struct Context {
     pub coins: i32,
+    pub luck: i32,
     pub settings: Settings,
     pub luts: LookUpTables,
     pub screen: Screen,
@@ -27,6 +28,7 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             coins: 600,
+            luck: 0,
             settings: Settings {
                 vignette_enabled: true,
                 bg_shader_enabled: true,
@@ -65,6 +67,7 @@ impl Default for Context {
                 ],
             },
             table: Table {
+                poker_hand: None,
                 cards_on_table: vec![],
             },
             hand: Hand {
