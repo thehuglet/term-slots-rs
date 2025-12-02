@@ -25,7 +25,6 @@ use rand::seq::SliceRandom;
 use std::{
     env,
     io::{self, Stdout, Write},
-    process::exit,
 };
 
 use crate::{
@@ -37,6 +36,7 @@ use crate::{
     },
     context::Context,
     dragged_card::{CardDragState, draw_dragged_card},
+    fps_counter::draw_fps_counter,
     fps_limiter::FPSLimiter,
     hand::{CardInHand, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
@@ -82,26 +82,26 @@ fn main() -> io::Result<()> {
     ctx.hand.cards_in_hand = vec![None; ctx.hand.hand_size as usize];
     ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
 
-    // ! DEBUG !
-    // Prefilling card slots
-    ctx.hand.cards_in_hand[0] = Some(CardInHand {
-        card: PlayingCard {
-            suit: Suit::Heart,
-            rank: Rank::Ace,
-        },
-    });
-    ctx.hand.cards_in_hand[2] = Some(CardInHand {
-        card: PlayingCard {
-            suit: Suit::Spade,
-            rank: Rank::Ace,
-        },
-    });
-    ctx.hand.cards_in_hand[5] = Some(CardInHand {
-        card: PlayingCard {
-            suit: Suit::Club,
-            rank: Rank::Ace,
-        },
-    });
+    // // ! DEBUG !
+    // // Prefilling card slots
+    // ctx.hand.cards_in_hand[0] = Some(CardInHand {
+    //     card: PlayingCard {
+    //         suit: Suit::Heart,
+    //         rank: Rank::Ace,
+    //     },
+    // });
+    // ctx.hand.cards_in_hand[2] = Some(CardInHand {
+    //     card: PlayingCard {
+    //         suit: Suit::Spade,
+    //         rank: Rank::Ace,
+    //     },
+    // });
+    // ctx.hand.cards_in_hand[5] = Some(CardInHand {
+    //     card: PlayingCard {
+    //         suit: Suit::Club,
+    //         rank: Rank::Ace,
+    //     },
+    // });
 
     for column in &mut ctx.slots.columns {
         column.cards.shuffle(&mut rand::rng());
@@ -192,6 +192,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             }
 
             ctx.coins += coins_reward_total as i32;
+            ctx.score += coins_reward_total as u32;
 
             // Clear hand
             ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
@@ -350,8 +351,8 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     draw_queue.push(DrawCall {
         x: SIDEBAR_BORDER_X + 3,
         y: 3,
-        rich_text: RichText::new(format!("{:>12}", 124))
-            .with_fg(Rgba::from_u8(255, 255, 255, 1.0))
+        rich_text: RichText::new(format!("{:>12}", ctx.score))
+            .with_fg(Rgba::from_u8(190, 230, 255, 1.0))
             .with_bold(true),
     });
 
@@ -402,7 +403,8 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         draw_button(&mut draw_queue, ctx, button)
     }
 
-    // draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
+    draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
+
     if let CardDragState::Dragging { card, .. } = ctx.mouse.card_drag.clone() {
         draw_dragged_card(&mut draw_queue, &card, ctx);
     }

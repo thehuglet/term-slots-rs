@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub struct Context {
+    pub score: u32,
     pub coins: i32,
     pub luck: i32,
     pub settings: Settings,
@@ -27,6 +28,7 @@ pub struct Context {
 impl Default for Context {
     fn default() -> Self {
         Self {
+            score: 0,
             coins: 600,
             luck: 0,
             settings: Settings {

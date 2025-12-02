@@ -40,6 +40,24 @@ impl PokerHand {
             PokerHand::FlushFive => "Flush Five",
         }
     }
+
+    pub fn coin_value(&self) -> i32 {
+        match self {
+            PokerHand::FlushFive => 170,
+            PokerHand::FlushHouse => 165,
+            PokerHand::FiveOfAKind => 150,
+            PokerHand::RoyalFlush => 140,
+            PokerHand::StraightFlush => 120,
+            PokerHand::FourOfAKind => 100,
+            PokerHand::FullHouse => 80,
+            PokerHand::Flush => 55,
+            PokerHand::Straight => 50,
+            PokerHand::ThreeOfAKind => 30,
+            PokerHand::TwoPair => 20,
+            PokerHand::Pair => 5,
+            PokerHand::HighCard => 0,
+        }
+    }
 }
 
 // Helper functions that don't modify the original enums
@@ -402,43 +420,5 @@ fn check_straight(rank_counts: &[u8; 13], cards: &[PlayingCard]) -> StraightInfo
     StraightInfo {
         is_straight: false,
         cards: Vec::new(),
-    }
-}
-
-impl PokerHand {
-    pub fn name(&self) -> &'static str {
-        match self {
-            PokerHand::FlushFive => "Flush Five",
-            PokerHand::FlushHouse => "Flush House",
-            PokerHand::FiveOfAKind => "Five of a Kind",
-            PokerHand::RoyalFlush => "Royal Flush",
-            PokerHand::StraightFlush => "Straight Flush",
-            PokerHand::FourOfAKind => "Four of a Kind",
-            PokerHand::FullHouse => "Full House",
-            PokerHand::Flush => "Flush",
-            PokerHand::Straight => "Straight",
-            PokerHand::ThreeOfAKind => "Three of a Kind",
-            PokerHand::TwoPair => "Two Pair",
-            PokerHand::Pair => "Pair",
-            PokerHand::HighCard => "High Card",
-        }
-    }
-
-    pub fn coin_value(&self) -> i32 {
-        match self {
-            PokerHand::FlushFive => 170,
-            PokerHand::FlushHouse => 165,
-            PokerHand::FiveOfAKind => 150,
-            PokerHand::RoyalFlush => 140,
-            PokerHand::StraightFlush => 120,
-            PokerHand::FourOfAKind => 100,
-            PokerHand::FullHouse => 80,
-            PokerHand::Flush => 55,
-            PokerHand::Straight => 50,
-            PokerHand::ThreeOfAKind => 30,
-            PokerHand::TwoPair => 20,
-            PokerHand::Pair => 5,
-            PokerHand::HighCard => 0,
-        }
     }
 }
