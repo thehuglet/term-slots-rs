@@ -24,13 +24,14 @@ use rand::seq::SliceRandom;
 use std::{
     env,
     io::{self, Stdout, Write},
+    process::exit,
 };
 
 use crate::{
     button::{Button, draw_button},
     constants::{
-        HAND_ORIGIN_X, HAND_ORIGIN_Y, SIDEBAR_BORDER_X, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y,
-        TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT,
+        HAND_ORIGIN_X, HAND_ORIGIN_Y, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING, SLOTS_ORIGIN_X,
+        SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT,
     },
     context::Context,
     dragged_card::{CardDragState, draw_dragged_card},
@@ -45,8 +46,8 @@ use crate::{
     },
     shader::{apply_gamma_lut, apply_vignette, draw_bg_shader},
     slots::{
-        calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows, draw_slots_panel,
-        slots_are_spinning, spin_slots_column,
+        SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
+        draw_slots_panel, get_column_card_index, slots_are_spinning, spin_slots_column,
     },
     table::{draw_table, draw_table_card_slot},
 };
@@ -129,21 +130,51 @@ fn main() -> io::Result<()> {
 fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     // --- Buttons ---
     let mut buttons: Vec<Button> = vec![];
+    // Slots post-spin selection buttons
+    if matches!(ctx.slots.state, SlotsState::PostSpin) {
+        for column_index in 0..ctx.slots.columns.len() {
+            let index = column_index;
+            buttons.push(Button {
+                x: SLOTS_ORIGIN_X + column_index as u16 * SLOTS_COLUMNS_X_SPACING,
+                y: SLOTS_ORIGIN_Y,
+                w: 3,
+                text: "".to_string(),
+                color: Rgba::from_u8(0, 0, 0, 0.0),
+                on_click: Box::new(move |ctx: &mut Context| {
+                    ctx.slots.state = SlotsState::Idle;
+                    let card_index: usize = get_column_card_index(0, &ctx.slots.columns[index]);
+                    let card: PlayingCard = ctx.slots.columns[index].cards[card_index].clone();
+
+                    // Find the first empty slot in hand
+                    if let Some(empty_slot) = ctx
+                        .hand
+                        .cards_in_hand
+                        .iter_mut()
+                        .find(|slot| slot.is_none())
+                    {
+                        *empty_slot = Some(CardInHand { card });
+                    }
+                }),
+                enabled_when: |_| true,
+            });
+        }
+    }
 
     buttons.push(Button {
         x: SIDEBAR_BORDER_X + 3,
         y: 5,
         w: 12,
-        text: format!("🩨 {cost} SPIN", cost = 10),
+        text: format!("⦿ {cost} SPIN", cost = 10),
         color: Rgba::from_u8(255, 210, 140, 1.0),
-        on_click: |ctx: &mut Context| {
+        on_click: Box::new(move |ctx| {
             for (column_index, column) in ctx.slots.columns.iter_mut().enumerate() {
                 let spin_duration: f32 = calc_column_spin_duration_sec(column_index);
                 column.spin_duration = spin_duration;
                 column.spin_time_remaining = spin_duration;
             }
-        },
-        enabled_when: |ctx: &Context| slots_are_spinning(&ctx.slots),
+            ctx.slots.state = SlotsState::Spinning;
+        }),
+        enabled_when: |ctx| matches!(ctx.slots.state, SlotsState::Idle),
     });
 
     // --- Inputs ---
@@ -154,9 +185,15 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     // --- Game logic ---
-    for column in &mut ctx.slots.columns {
-        const MAX_SPIN_SPEED: f32 = 60.0;
-        spin_slots_column(column, dt, MAX_SPIN_SPEED);
+    if matches!(ctx.slots.state, SlotsState::Spinning) {
+        for column in &mut ctx.slots.columns {
+            const MAX_SPIN_SPEED: f32 = 60.0;
+            spin_slots_column(column, dt, MAX_SPIN_SPEED);
+        }
+
+        if slots_are_spinning(&ctx.slots) {
+            ctx.slots.state = SlotsState::PostSpin;
+        }
     }
 
     // --- Rendering ---
@@ -195,7 +232,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         SLOTS_ORIGIN_X,
         SLOTS_ORIGIN_Y,
         &ctx.slots,
-        &ctx,
+        ctx,
     );
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
 
@@ -205,10 +242,6 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     draw_hand_card_slot(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y);
     draw_hand(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y, ctx);
 
-    if let CardDragState::Dragging { card, .. } = &ctx.mouse.card_drag {
-        draw_dragged_card(&mut draw_queue, ctx.mouse.x, ctx.mouse.y, card);
-    }
-
     draw_sidebar_border(&mut draw_queue, SIDEBAR_BORDER_X);
 
     for button in &mut buttons {
@@ -216,6 +249,10 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     // draw_fps_counter(&mut draw_queue, 0, 0, &ctx.fps_counter);
+
+    if let CardDragState::Dragging { card, .. } = &ctx.mouse.card_drag {
+        draw_dragged_card(&mut draw_queue, ctx.mouse.x, ctx.mouse.y, card);
+    }
 
     // --- Renderer boilerplate ---
     compose_buffer(&mut ctx.screen.new_buffer, &draw_queue);

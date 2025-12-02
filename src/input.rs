@@ -113,7 +113,10 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
     let not_dragging: bool = matches!(drag_state, CardDragState::NotDragging);
     let maybe_button: Option<&Button> = get_button_at(buttons, ctx.mouse.x, ctx.mouse.y);
 
-    if not_dragging && let Some(button) = maybe_button {
+    if not_dragging
+        && let Some(button) = maybe_button
+        && (button.enabled_when)(ctx)
+    {
         (button.on_click)(ctx);
     }
 

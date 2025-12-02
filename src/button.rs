@@ -12,7 +12,7 @@ pub struct Button {
     pub w: u16,
     pub text: String,
     pub color: Rgba,
-    pub on_click: fn(&mut Context),
+    pub on_click: Box<dyn Fn(&mut Context)>,
     pub enabled_when: fn(&Context) -> bool,
 }
 

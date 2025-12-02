@@ -26,6 +26,15 @@ impl Rgba {
             a: a.clamp(0.0, 1.0),
         }
     }
+
+    pub fn lerp(self, other: Rgba, t: f32) -> Rgba {
+        Rgba::from_f32(
+            self.r as f32 / 255.0 * (1.0 - t) + other.r as f32 / 255.0 * t,
+            self.g as f32 / 255.0 * (1.0 - t) + other.g as f32 / 255.0 * t,
+            self.b as f32 / 255.0 * (1.0 - t) + other.b as f32 / 255.0 * t,
+            self.a * (1.0 - t) + other.a * t,
+        )
+    }
 }
 
 impl From<Hsl> for Rgba {
@@ -416,12 +425,3 @@ pub fn build_crossterm_content_style(cell: &Cell) -> ContentStyle {
         attributes: attrs,
     }
 }
-
-// pub fn lerp_rgba(a: &Rgba, b: &Rgba, t: f32) -> Rgba {
-//     Rgba::from_f32(
-//         a.r as f32 / 255.0 * (1.0 - t) + b.r as f32 / 255.0 * t,
-//         a.g as f32 / 255.0 * (1.0 - t) + b.g as f32 / 255.0 * t,
-//         a.b as f32 / 255.0 * (1.0 - t) + b.b as f32 / 255.0 * t,
-//         a.a * (1.0 - t) + b.a * t,
-//     )
-// }

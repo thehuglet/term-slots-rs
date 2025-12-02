@@ -48,6 +48,7 @@ impl Default for Context {
             },
             game_time: 0.0,
             slots: Slots {
+                state: crate::slots::SlotsState::PostSpin,
                 columns: vec![
                     Column {
                         cursor: 0.0,

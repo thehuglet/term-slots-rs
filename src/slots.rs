@@ -1,12 +1,20 @@
 use crate::{
     constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
     context::Context,
+    dragged_card::CardDragState,
     playing_card::{PlayingCard, draw_calls_playing_card_small},
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
+    utils::{lerp, lerp_hue},
 };
 
+pub enum SlotsState {
+    Idle,
+    Spinning,
+    PostSpin,
+}
+
 pub struct Slots {
-    // pub slots_state:
+    pub state: SlotsState,
     // pub spin_count: u32,
     pub columns: Vec<Column>,
 }
@@ -65,15 +73,14 @@ pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
     if column.spin_duration <= 0.0 {
         column.spin_speed = 0.0;
     } else {
-        let spin_speed = {
-            let exponent = 6.0;
-            let time_normalized =
-                (column.spin_time_remaining / column.spin_duration).clamp(0.0, 1.0);
+        let spin_speed: f32 = {
+            let exponent: f32 = 6.0;
+            let t: f32 = (column.spin_time_remaining / column.spin_duration).clamp(0.0, 1.0);
 
-            if time_normalized <= 0.0 || time_normalized <= SNAP_THRESHOLD {
+            if t <= 0.0 || t <= SNAP_THRESHOLD {
                 0.0
             } else {
-                max_spin_speed * (1.0 - (1.0 - time_normalized).powf(exponent))
+                max_spin_speed * (1.0 - (1.0 - t).powf(exponent))
             }
         };
         column.spin_speed = spin_speed;
@@ -89,6 +96,13 @@ pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
 
 pub fn slots_are_spinning(slots: &Slots) -> bool {
     slots.columns.iter().all(|column| column.spin_speed == 0.0)
+}
+
+pub fn get_column_card_index(row_offset: i16, column: &Column) -> usize {
+    let cards_len: i16 = column.cards.len() as i16;
+    let index: i16 = column.cursor as i16 + row_offset;
+    let wrapped_index: i16 = index.rem_euclid(cards_len);
+    wrapped_index as usize
 }
 
 /// Slot columns are supposed to be drawn on top of this.
@@ -145,25 +159,45 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
 }
 
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
+    let any_column_hovered: bool = (0..slots.columns.len()).any(|column_index| {
+        let local_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
+
+        point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            local_x,
+            y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
+            local_x + 2,
+            y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
+        )
+    });
+
     for (col_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = col_index as u16;
         let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;
 
-        draw_column(draw_queue, column_x, column_y, column, ctx);
+        draw_column(
+            draw_queue,
+            column_x,
+            column_y,
+            column,
+            ctx,
+            any_column_hovered,
+        );
     }
 }
 
-fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column, ctx: &Context) {
-    fn get_card_index(row_offset: i16, column: &Column) -> usize {
-        let cards_len: i16 = column.cards.len() as i16;
-        let index: i16 = column.cursor as i16 + row_offset;
-        let wrapped_index: i16 = index.rem_euclid(cards_len);
-        wrapped_index as usize
-    }
-
+fn draw_column(
+    draw_queue: &mut Vec<DrawCall>,
+    x: u16,
+    y: u16,
+    column: &Column,
+    ctx: &Context,
+    any_column_hovered: bool,
+) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
-        let card_index: usize = get_card_index(row_offset, column);
+        let card_index: usize = get_column_card_index(row_offset, column);
         let card: &PlayingCard = &column.cards[card_index];
 
         // If `y` is ever negative, the slots are drawn too high up, in which case that's a developer mistake.
@@ -180,30 +214,50 @@ fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column, 
         let card_x: u16 = x;
         let card_y: u16 = card_y_signed as u16;
 
-        let mut card_draw_call: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
-        let mut fg_hsl: Hsl = card_draw_call.rich_text.fg.into();
-        let mut bg_hsl: Hsl = card_draw_call.rich_text.bg.into();
+        let mut card: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
+
+        let mouse_hovering_this_column: bool =
+            point_in_rect(ctx.mouse.x, ctx.mouse.y, card_x, card_y, card_x + 2, card_y);
+
+        // // "Interact with me" flashing post-spin
+        // if !any_column_hovered {
+        //     // let peak: f32 = 0.4;
+        //     // let frequency: f32 = 7.0;
+        //     // let t: f32 = ((frequency * ctx.game_time).sin() * 0.5 + 0.5) * peak;
+        //     let t: f32 = 0.5;
+        //     let flash_color = Rgba::from_f32(0.5, 0.5, 0.0, 1.0);
+
+        //     card.rich_text.fg = card.rich_text.fg.lerp(flash_color, t * 0.75);
+        //     card.rich_text.bg = card.rich_text.bg.lerp(flash_color, t);
+        // }
 
         if row_offset == 0 {
-            // Mouse hover experiment
-            let mouse_is_hovering: bool =
-                point_in_rect(ctx.mouse.x, ctx.mouse.y, card_x, card_y, card_x + 3, card_y);
+            if matches!(ctx.slots.state, SlotsState::PostSpin) {
+                // Mouse hover experiment
+                let flash_color = Rgba::from_f32(1.0, 1.0, 0.3, 1.0);
 
-            if mouse_is_hovering {
-                fg_hsl.l *= 0.1;
-                bg_hsl.l *= 0.1;
+                // card.rich_text.fg = card.rich_text.fg.lerp(flash_color, t * 0.75);
+                card.rich_text.bg = card.rich_text.bg.lerp(flash_color, 0.9);
+
+                let not_dragging: bool = matches!(ctx.mouse.card_drag, CardDragState::NotDragging);
+
+                if mouse_hovering_this_column && not_dragging {
+                    let flash_color = Rgba::from_f32(0.0, 1.0, 0.0, 1.0);
+                    card.rich_text.fg = card.rich_text.fg.lerp(flash_color, 0.5);
+                    card.rich_text.bg = card.rich_text.bg.lerp(flash_color, 0.8);
+                    // fg_hsl.l *= 0.1;
+                    // bg_hsl.l *= 0.1;
+                }
             }
         } else {
             let sigma: f32 = 1.5;
             let gaussian_factor: f32 = (-(row_offset.pow(2) as f32) / (2.0 * sigma.powi(2))).exp();
-            fg_hsl.l *= gaussian_factor * 0.7;
-            bg_hsl.l *= gaussian_factor * 0.7;
+            let black = Rgba::from_u8(0, 0, 0, 1.0);
+            card.rich_text.fg = card.rich_text.fg.lerp(black, 1.0 - gaussian_factor);
+            card.rich_text.bg = card.rich_text.bg.lerp(black, 1.0 - gaussian_factor);
         }
 
-        card_draw_call.rich_text.fg = fg_hsl.into();
-        card_draw_call.rich_text.bg = bg_hsl.into();
-
-        draw_queue.push(card_draw_call);
+        draw_queue.push(card);
     }
 }
 
