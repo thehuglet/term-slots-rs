@@ -1,20 +1,22 @@
-use std::time::Duration;
+use std::{mem::take, process::exit, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEventKind};
 
 use crate::{
     button::{Button, get_button_at},
     constants::{
-        HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X,
-        TABLE_ORIGIN_Y, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
+        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
+        HAND_ORIGIN_Y, HAND_SLOT_COUNT, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
+        TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     },
     context::Context,
     dragged_card::{
         CardDragState, DragAndDropLocation, delete_card_at, get_valid_drop_destination,
         location_has_card, place_card_at, swap_cards_at,
     },
-    playing_card::get_card_hitbox_rect,
+    hand::CardInHand,
     renderer::{Screen, point_in_rect},
+    table::CardOnTable,
     utils::iter_some,
 };
 
@@ -50,6 +52,7 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
         }
         Event::Mouse(mouse_event) => match mouse_event.kind {
             MouseEventKind::Down(MouseButton::Left) => on_left_click_down(ctx),
+            MouseEventKind::Down(MouseButton::Right) => on_right_click_down(ctx),
             MouseEventKind::Up(MouseButton::Left) => on_left_click_up(ctx, buttons),
             MouseEventKind::Moved => {
                 ctx.mouse.x = mouse_event.column;
@@ -80,25 +83,31 @@ fn on_left_click_down(ctx: &mut Context) {
     ctx.mouse.is_left_down = true;
 
     // Drag detection
-    // > Hand
-    for (index, card_in_hand) in iter_some(&ctx.hand.cards_in_hand) {
-        let (x1, y1, x2, y2) =
-            get_card_hitbox_rect(HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_CARD_X_SPACING, index);
-        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
-            ctx.mouse.card_drag = CardDragState::Dragging {
-                card: card_in_hand.card.clone(),
-                source: DragAndDropLocation::Hand { index },
-            };
-        }
-    }
     // > Table
     for (index, card_on_table) in iter_some(&ctx.table.cards_on_table) {
-        let (x1, y1, x2, y2) =
-            get_card_hitbox_rect(TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_CARD_X_SPACING, index);
+        let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
+        let y1: u16 = TABLE_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
+
         if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: card_on_table.card.clone(),
                 source: DragAndDropLocation::Table { index },
+            };
+        }
+    }
+    // > Hand
+    for (index, card_in_hand) in iter_some(&ctx.hand.cards_in_hand) {
+        let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
+        let y1: u16 = HAND_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
+
+        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
+            ctx.mouse.card_drag = CardDragState::Dragging {
+                card: card_in_hand.card.clone(),
+                source: DragAndDropLocation::Hand { index },
             };
         }
     }
@@ -135,6 +144,96 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
         } else {
             place_card_at(ctx, card, &destination);
             delete_card_at(ctx, &source);
+        }
+    }
+}
+
+fn on_right_click_down(ctx: &mut Context) {
+    // Check if clicked on a table card first (Table -> Hand)
+    for table_slot_index in 0..TABLE_SLOT_COUNT {
+        let x1: u16 = TABLE_ORIGIN_X + table_slot_index as u16 * HAND_CARD_X_SPACING;
+        let y1: u16 = TABLE_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
+
+        let hitbox_not_clicked: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
+        let source_slot_empty: bool = ctx.table.cards_on_table[table_slot_index as usize].is_none();
+
+        if hitbox_not_clicked || source_slot_empty {
+            continue;
+        }
+
+        let hand_empty_slots: usize = ctx
+            .hand
+            .cards_in_hand
+            .iter()
+            .filter(|slot| slot.is_none())
+            .count();
+
+        if hand_empty_slots == 0 {
+            return; // Hand is full, can't take table card
+        }
+
+        if let Some(empty_hand_slot) = ctx
+            .hand
+            .cards_in_hand
+            .iter_mut()
+            .find(|slot| slot.is_none())
+        {
+            let card_container = ctx.table.cards_on_table[table_slot_index as usize]
+                .take()
+                .expect("We already checked this exists");
+
+            *empty_hand_slot = Some(CardInHand {
+                card: card_container.card,
+            });
+
+            // Table card moved to hand, can skip rest of loop
+            return;
+        }
+    }
+
+    // Check if clicked on a hand card (Hand -> Table)
+    for hand_slot_index in 0..HAND_SLOT_COUNT {
+        let x1: u16 = HAND_ORIGIN_X + hand_slot_index as u16 * HAND_CARD_X_SPACING;
+        let y1: u16 = HAND_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
+
+        let hitbox_not_clicked: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
+        let source_slot_empty: bool = ctx.hand.cards_in_hand[hand_slot_index as usize].is_none();
+
+        if hitbox_not_clicked || source_slot_empty {
+            continue;
+        }
+
+        let table_empty_slots: usize = ctx
+            .table
+            .cards_on_table
+            .iter()
+            .filter(|slot| slot.is_none())
+            .count();
+
+        if table_empty_slots == 0 {
+            return; // Table is full, can't take hand card
+        }
+
+        if let Some(empty_table_slot) = ctx
+            .table
+            .cards_on_table
+            .iter_mut()
+            .find(|slot| slot.is_none())
+        {
+            let card_container = ctx.hand.cards_in_hand[hand_slot_index as usize]
+                .take()
+                .expect("We already checked this exists");
+
+            *empty_table_slot = Some(CardOnTable {
+                card: card_container.card,
+            });
+
+            // Hand card moved to table, can skip rest of loop
+            return;
         }
     }
 }

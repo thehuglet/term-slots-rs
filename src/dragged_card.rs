@@ -5,7 +5,7 @@ use crate::{
     },
     context::Context,
     hand::CardInHand,
-    playing_card::{PlayingCard, draw_calls_playing_card_big, get_card_hitbox_rect},
+    playing_card::{PlayingCard, draw_calls_playing_card_big},
     renderer::{DrawCall, Rgba, draw_rect, point_in_rect},
     slots::SlotsState,
     table::CardOnTable,
@@ -31,12 +31,10 @@ pub fn get_valid_drop_destination(
 ) -> Option<DragAndDropLocation> {
     for table_slot_index in 0..ctx.table.cards_on_table.len() {
         // Table checks
-        let (x1, y1, x2, y2) = get_card_hitbox_rect(
-            TABLE_ORIGIN_X,
-            TABLE_ORIGIN_Y,
-            TABLE_CARD_X_SPACING,
-            table_slot_index,
-        );
+        let x1: u16 = TABLE_ORIGIN_X + table_slot_index as u16 * TABLE_CARD_X_SPACING;
+        let y1: u16 = TABLE_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
         let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Table { index } if *index == table_slot_index);
         // let destination_is_locked: bool = !matches!(ctx.slots.state, SlotsState::Idle);
@@ -58,12 +56,10 @@ pub fn get_valid_drop_destination(
 
     for hand_slot_index in 0..ctx.hand.cards_in_hand.len() {
         // Hand checks
-        let (x1, y1, x2, y2) = get_card_hitbox_rect(
-            HAND_ORIGIN_X,
-            HAND_ORIGIN_Y,
-            HAND_CARD_X_SPACING,
-            hand_slot_index,
-        );
+        let x1: u16 = HAND_ORIGIN_X + hand_slot_index as u16 * HAND_CARD_X_SPACING;
+        let y1: u16 = HAND_ORIGIN_Y;
+        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
+        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
         let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Hand { index } if *index == hand_slot_index);
         let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);

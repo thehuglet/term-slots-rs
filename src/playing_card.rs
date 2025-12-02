@@ -189,19 +189,6 @@ pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &PlayingCard) -> Vec<Dr
     draw_calls
 }
 
-pub fn get_card_hitbox_rect(
-    origin_x: u16,
-    origin_y: u16,
-    spacing: u16,
-    index: usize,
-) -> (u16, u16, u16, u16) {
-    let x1: u16 = origin_x + index as u16 * spacing;
-    let y1: u16 = origin_y;
-    let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-    let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
-    (x1, y1, x2, y2)
-}
-
 pub fn standard_52_deck() -> Vec<PlayingCard> {
     Suit::iter()
         .flat_map(|suit| Rank::iter().map(move |rank| PlayingCard { suit, rank }))
