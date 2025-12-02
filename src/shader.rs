@@ -51,7 +51,7 @@ pub fn apply_vignette(buf: &mut ScreenBuffer, lut: &[f32]) {
     }
 }
 
-pub fn apply_gamma_lut(buffer: &mut ScreenBuffer, lut: &[u8; 256]) {
+pub fn apply_gamma(buffer: &mut ScreenBuffer, lut: &[u8; 256]) {
     for cell in buffer.cells.iter_mut() {
         let mut bg = packed_rgb_to_rgba(cell.bg);
         bg.r = lut[bg.r as usize];

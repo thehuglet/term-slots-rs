@@ -81,7 +81,7 @@ fn button_bg(ctx: &Context, button: &Button, w: u16, h: u16) -> Rgba {
 
     if is_disabled {
         hsl.l *= 0.4;
-        hsl.s *= 0.4;
+        hsl.s *= 0.25;
     } else if !is_dragging_anything {
         if is_pressed {
             hsl.l *= 0.3;

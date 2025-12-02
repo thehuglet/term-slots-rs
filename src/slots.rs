@@ -4,7 +4,6 @@ use crate::{
     dragged_card::CardDragState,
     playing_card::{PlayingCard, draw_calls_playing_card_small},
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
-    utils::{lerp, lerp_hue},
 };
 
 pub enum SlotsState {
@@ -15,7 +14,7 @@ pub enum SlotsState {
 
 pub struct Slots {
     pub state: SlotsState,
-    // pub spin_count: u32,
+    pub spin_count: u32,
     pub columns: Vec<Column>,
 }
 
@@ -26,6 +25,35 @@ pub struct Column {
     pub spin_duration: f32,
     pub spin_time_remaining: f32,
     pub spin_speed: f32,
+}
+
+pub fn build_spin_cost_lut(max_spins: usize) -> Vec<u32> {
+    let base: f32 = 5.0;
+    let growth: f32 = 1.3;
+    let divisor: f32 = 3.0;
+
+    let mut lut: Vec<u32> = Vec::with_capacity(max_spins);
+
+    for spin in 0..max_spins {
+        let cost: f32 = if spin == 0 {
+            base
+        } else {
+            let exp: f32 = spin as f32 / divisor; // spin, not spin-1
+            base * growth.powf(exp)
+        };
+        lut.push(cost.round() as u32);
+    }
+
+    lut
+}
+
+pub fn spin_cost(spin_count: u32, lut: &[u32]) -> u32 {
+    let cost_index: usize = spin_count as usize;
+    lut.get(cost_index).copied().unwrap_or_else(|| {
+        let last: u32 = *lut.last().unwrap_or(&5);
+        let extra: usize = spin_count as usize - (lut.len() - 1);
+        (last as f64 * 1.3f64.powf(extra as f64 / 3.0)).round() as u32
+    })
 }
 
 pub fn calc_column_spin_duration_sec(col_index: usize) -> f32 {

@@ -30,26 +30,26 @@ use std::{
 use crate::{
     button::{Button, draw_button},
     constants::{
-        HAND_ORIGIN_X, HAND_ORIGIN_Y, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING, SLOTS_ORIGIN_X,
-        SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT,
+        HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
+        SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT,
+        TERM_SCREEN_HEIGHT,
     },
     context::Context,
     dragged_card::{CardDragState, draw_dragged_card},
-    fps_counter::draw_fps_counter,
     fps_limiter::FPSLimiter,
-    hand::{CardInHand, draw_hand, draw_hand_card_slot},
+    hand::{CardInHand, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
     playing_card::{PlayingCard, Rank, Suit},
     renderer::{
-        Cell, DrawCall, Hsl, Rgba, build_crossterm_content_style, compose_buffer, diff_buffers,
-        draw_rect, fill_screen_background,
+        Cell, DrawCall, Hsl, Rgba, RichText, build_crossterm_content_style, compose_buffer,
+        diff_buffers, draw_rect, fill_screen_background,
     },
-    shader::{apply_gamma_lut, apply_vignette, draw_bg_shader},
+    shader::{apply_gamma, apply_vignette, draw_bg_shader},
     slots::{
         SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
-        draw_slots_panel, get_column_card_index, slots_are_spinning, spin_slots_column,
+        draw_slots_panel, get_column_card_index, slots_are_spinning, spin_cost, spin_slots_column,
     },
-    table::{draw_table, draw_table_card_slot},
+    table::{draw_table, draw_table_card_slots},
 };
 
 fn main() -> io::Result<()> {
@@ -130,8 +130,97 @@ fn main() -> io::Result<()> {
 fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramStatus> {
     // --- Buttons ---
     let mut buttons: Vec<Button> = vec![];
+
+    // Spin button
+    buttons.push(Button {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 9,
+        w: 12,
+        text: format!(
+            "${cost} SPIN",
+            cost = spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost)
+        ),
+        color: Rgba::from_u8(255, 210, 140, 1.0),
+        on_click: Box::new(move |ctx| {
+            for (column_index, column) in ctx.slots.columns.iter_mut().enumerate() {
+                let spin_duration: f32 = calc_column_spin_duration_sec(column_index);
+                column.spin_duration = spin_duration;
+                column.spin_time_remaining = spin_duration;
+            }
+
+            ctx.slots.state = SlotsState::Spinning;
+            ctx.coins = ctx
+                .coins
+                .saturating_sub(spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost) as i32);
+            ctx.slots.spin_count += 1;
+        }),
+        enabled_when: |ctx| {
+            matches!(ctx.slots.state, SlotsState::Idle)
+                && ctx.coins >= spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost) as i32
+        },
+    });
+
+    // Play button
+    buttons.push(Button {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 14,
+        w: 12,
+        text: "PLAY".to_string(),
+        color: Rgba::from_u8(160, 210, 140, 1.0),
+        on_click: Box::new(move |ctx: &mut Context| {}),
+        enabled_when: |ctx| {
+            let cards_on_table_count = ctx
+                .table
+                .cards_on_table
+                .iter()
+                .filter(|opt| opt.is_some())
+                .count();
+
+            cards_on_table_count > 0
+        },
+    });
+
+    // Burn button
+    buttons.push(Button {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 16,
+        w: 12,
+        text: "BURN".to_string(),
+        color: Rgba::from_u8(255, 70, 90, 1.0),
+        on_click: Box::new(move |ctx: &mut Context| {
+            ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+        }),
+        enabled_when: |ctx| {
+            let cards_on_table_count = ctx
+                .table
+                .cards_on_table
+                .iter()
+                .filter(|opt| opt.is_some())
+                .count();
+
+            cards_on_table_count > 0
+        },
+    });
+
     // Slots post-spin selection buttons
-    if matches!(ctx.slots.state, SlotsState::PostSpin) {
+    let cards_in_hand_count = ctx
+        .hand
+        .cards_in_hand
+        .iter()
+        .filter(|opt| opt.is_some())
+        .count();
+
+    let cards_on_table_count = ctx
+        .table
+        .cards_on_table
+        .iter()
+        .filter(|opt| opt.is_some())
+        .count();
+
+    if matches!(ctx.slots.state, SlotsState::PostSpin)
+        && cards_on_table_count == 0
+        && cards_in_hand_count < HAND_SLOT_COUNT.into()
+    {
         for column_index in 0..ctx.slots.columns.len() {
             let index = column_index;
             buttons.push(Button {
@@ -159,23 +248,6 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             });
         }
     }
-
-    buttons.push(Button {
-        x: SIDEBAR_BORDER_X + 3,
-        y: 5,
-        w: 12,
-        text: format!("⦿ {cost} SPIN", cost = 10),
-        color: Rgba::from_u8(255, 210, 140, 1.0),
-        on_click: Box::new(move |ctx| {
-            for (column_index, column) in ctx.slots.columns.iter_mut().enumerate() {
-                let spin_duration: f32 = calc_column_spin_duration_sec(column_index);
-                column.spin_duration = spin_duration;
-                column.spin_time_remaining = spin_duration;
-            }
-            ctx.slots.state = SlotsState::Spinning;
-        }),
-        enabled_when: |ctx| matches!(ctx.slots.state, SlotsState::Idle),
-    });
 
     // --- Inputs ---
     for event in drain_input() {
@@ -236,13 +308,31 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     );
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
 
-    draw_table_card_slot(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y);
+    draw_table_card_slots(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, ctx);
     draw_table(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, ctx);
 
-    draw_hand_card_slot(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y);
+    draw_hand_card_slots(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y);
     draw_hand(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y, ctx);
 
     draw_sidebar_border(&mut draw_queue, SIDEBAR_BORDER_X);
+
+    // Score drawing
+    draw_queue.push(DrawCall {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 3,
+        rich_text: RichText::new(format!("{:>12}", 124))
+            .with_fg(Rgba::from_u8(255, 255, 255, 1.0))
+            .with_bold(true),
+    });
+
+    // Coin drawing
+    draw_queue.push(DrawCall {
+        x: SIDEBAR_BORDER_X + 3,
+        y: 4,
+        rich_text: RichText::new(format!("{:>12}", format!("${}", ctx.coins)))
+            .with_fg(Rgba::from_u8(255, 255, 180, 1.0))
+            .with_bold(true),
+    });
 
     for button in &mut buttons {
         draw_button(&mut draw_queue, ctx, button)
@@ -258,7 +348,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     compose_buffer(&mut ctx.screen.new_buffer, &draw_queue);
 
     // Post processing step
-    apply_gamma_lut(&mut ctx.screen.new_buffer, &ctx.luts.gamma);
+    apply_gamma(&mut ctx.screen.new_buffer, &ctx.luts.gamma);
     if ctx.settings.vignette_enabled {
         apply_vignette(&mut ctx.screen.new_buffer, &ctx.luts.vignette);
     }
@@ -294,7 +384,7 @@ fn draw_sidebar_border(draw_queue: &mut Vec<DrawCall>, x: u16) {
     }
 
     // Shadow
-    let shadow_width = 2;
+    let shadow_width: i32 = 2;
     for i in 0..shadow_width {
         let t: f32 = 1.0 - (i as f32 / shadow_width as f32);
         let alpha: f32 = t * 0.1;

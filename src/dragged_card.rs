@@ -7,6 +7,7 @@ use crate::{
     hand::CardInHand,
     playing_card::{PlayingCard, draw_calls_playing_card_big, get_card_hitbox_rect},
     renderer::{DrawCall, Rgba, draw_rect, point_in_rect},
+    slots::SlotsState,
     table::CardOnTable,
 };
 
@@ -21,11 +22,6 @@ pub enum CardDragState {
 pub enum DragAndDropLocation {
     Hand { index: usize },
     Table { index: usize },
-}
-
-pub fn dragged_source_vfx_sinewave(t: f32) -> f32 {
-    let frequency: f32 = 7.5;
-    0.5 + 0.25 * ((frequency * t).sin() + 1.0)
 }
 
 /// Retrieves the location at which a card was dropped if it was dropped on one.
@@ -43,9 +39,15 @@ pub fn get_valid_drop_destination(
         );
 
         let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Table { index } if *index == table_slot_index);
+        // let destination_is_locked: bool = !matches!(ctx.slots.state, SlotsState::Idle);
+        let destination_is_locked: bool = false;
         let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
 
-        if destination_is_source || hitbox_check_failed {
+        if destination_is_locked {
+            continue;
+        };
+
+        if destination_is_source || destination_is_locked || hitbox_check_failed {
             continue;
         }
 

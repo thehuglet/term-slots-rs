@@ -6,11 +6,12 @@ use crate::{
     playing_card::standard_52_deck,
     renderer::Screen,
     shader::{build_gamma_lut, build_vignette_lut},
-    slots::{Column, Slots},
+    slots::{Column, Slots, build_spin_cost_lut},
     table::Table,
 };
 
 pub struct Context {
+    pub coins: i32,
     pub settings: Settings,
     pub luts: LookUpTables,
     pub screen: Screen,
@@ -25,18 +26,20 @@ pub struct Context {
 impl Default for Context {
     fn default() -> Self {
         Self {
+            coins: 600,
             settings: Settings {
                 vignette_enabled: true,
                 bg_shader_enabled: true,
             },
             luts: LookUpTables {
+                spin_cost: build_spin_cost_lut(1000),
                 gamma: build_gamma_lut(0.75),
                 vignette: build_vignette_lut(
                     TERM_SCREEN_WIDTH as usize,
                     TERM_SCREEN_HEIGHT as usize,
                     1.3,
                     2.0,
-                    1.0,
+                    0.6,
                 ),
             },
             screen: Screen::new(TERM_SCREEN_WIDTH, TERM_SCREEN_HEIGHT, (0, 0, 0)),
@@ -48,7 +51,8 @@ impl Default for Context {
             },
             game_time: 0.0,
             slots: Slots {
-                state: crate::slots::SlotsState::PostSpin,
+                state: crate::slots::SlotsState::Idle,
+                spin_count: 0,
                 columns: vec![
                     Column {
                         cursor: 0.0,
@@ -85,6 +89,7 @@ pub struct Settings {
 }
 
 pub struct LookUpTables {
+    pub spin_cost: Vec<u32>,
     pub gamma: [u8; 256],
     pub vignette: Vec<f32>,
 }
