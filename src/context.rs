@@ -11,14 +11,14 @@ use crate::{
 };
 
 pub struct Context {
-    pub score: u32,
+    pub score: i32,
     pub coins: i32,
     pub luck: i32,
+    pub game_time: f32,
     pub settings: Settings,
     pub luts: LookUpTables,
     pub screen: Screen,
     pub mouse: MouseContext,
-    pub game_time: f32,
     pub slots: Slots,
     pub table: Table,
     pub hand: Hand,
@@ -96,7 +96,7 @@ pub struct Settings {
 }
 
 pub struct LookUpTables {
-    pub spin_cost: Vec<u32>,
+    pub spin_cost: Vec<i32>,
     pub gamma: [u8; 256],
     pub vignette: Vec<f32>,
 }

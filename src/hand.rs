@@ -33,7 +33,7 @@ pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) 
         }
 
         let mut draw_calls: Vec<DrawCall> =
-            draw_calls_playing_card_big(card_x as i16, card_y as i16, &card);
+            draw_calls_playing_card_big(card_x as i16, card_y as i16, card);
 
         for dc in &mut draw_calls {
             let mut fg_hsl: Hsl = dc.rich_text.fg.into();

@@ -121,7 +121,7 @@ pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &Card) -> DrawCall {
     let suit_color: Rgba = card.suit.color();
     let bg_color: Rgba = DEFAULT_CARD_BG_COLOR;
 
-    let text: String = format!("{suit}{rank:>2}", suit = suit_repr, rank = rank_repr);
+    let text: String = format!("{suit_repr}{rank_repr:>2}");
 
     DrawCall {
         x,
@@ -173,8 +173,8 @@ pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &Card) -> Vec<DrawCall>
         }
 
         let mut text_row = pattern_row.to_string();
-        text_row = text_row.replace("<<", &format!("{:<2}", rank_repr));
-        text_row = text_row.replace(">>", &format!("{:>2}", rank_repr));
+        text_row = text_row.replace("<<", &format!("{rank_repr:<2}"));
+        text_row = text_row.replace(">>", &format!("{rank_repr:>2}"));
         text_row = text_row.replace("S", suit_repr);
 
         // x clipping

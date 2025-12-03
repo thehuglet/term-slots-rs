@@ -18,37 +18,26 @@ pub struct Button {
 }
 
 pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
-    for button in buttons {
-        let button_x2: u16 = button.x + button.w - 1;
-        let button_y2: u16 = button.y + button.h - 1;
-
-        if point_in_rect(x, y, button.x, button.y, button_x2, button_y2) {
-            return Some(button);
-        };
-    }
-
-    None
+    buttons
+        .iter()
+        .find(|&button| point_in_rect(x, y, button.x, button.y, button.w, button.h))
 }
 
 pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Button) {
-    let w: u16 = button.w;
-    let h: u16 = button.h;
-
     draw_rect(
         draw_queue,
         button.x as i16,
         button.y as i16,
-        w,
-        h,
-        button_bg(ctx, button, w, h),
+        button.w,
+        button.h,
+        button_bg(ctx, button),
     );
 
     // measure the display width
     let text_w: u16 = UnicodeWidthStr::width(button.text.as_str()) as u16;
 
     // center inside the button
-    // leave 1-char padding if you want, or remove it entirely
-    let inner_w = w.saturating_sub(2);
+    let inner_w = button.w.saturating_sub(2);
     let offset = (inner_w.saturating_sub(text_w)) / 2;
 
     let draw_x = button.x + 1 + offset;
@@ -62,10 +51,7 @@ pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Butto
     });
 }
 
-fn button_bg(ctx: &Context, button: &Button, w: u16, h: u16) -> Rgba {
-    let button_x2: u16 = button.x + w - 1;
-    let button_y2: u16 = button.y + h - 1;
-
+fn button_bg(ctx: &Context, button: &Button) -> Rgba {
     let mut hsl: Hsl = button.color.into();
 
     let is_hovered: bool = point_in_rect(
@@ -73,8 +59,8 @@ fn button_bg(ctx: &Context, button: &Button, w: u16, h: u16) -> Rgba {
         ctx.mouse.y,
         button.x,
         button.y,
-        button_x2,
-        button_y2,
+        button.w,
+        button.h,
     );
     let is_pressed: bool = is_hovered && ctx.mouse.is_left_down;
     let is_disabled: bool = !(button.enabled_when)(ctx);

@@ -87,10 +87,15 @@ fn on_left_click_down(ctx: &mut Context) {
     for (index, card) in iter_some(&ctx.table.cards_on_table) {
         let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
-        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
+        if point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
                 source: DragAndDropLocation::Table { index },
@@ -101,10 +106,15 @@ fn on_left_click_down(ctx: &mut Context) {
     for (index, card) in iter_some(&ctx.hand.cards_in_hand) {
         let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
-        if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
+        if point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
                 source: DragAndDropLocation::Hand { index },
@@ -196,10 +206,15 @@ fn on_right_click_down(ctx: &mut Context) {
     for hand_slot_index in 0..HAND_SLOT_COUNT {
         let x1: u16 = HAND_ORIGIN_X + hand_slot_index * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
-        let hitbox_not_clicked: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
+        let hitbox_not_clicked: bool = !point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        );
         let source_slot_empty: bool = ctx.hand.cards_in_hand[hand_slot_index as usize].is_none();
 
         if hitbox_not_clicked || source_slot_empty {

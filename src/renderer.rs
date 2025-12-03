@@ -218,15 +218,8 @@ pub struct DrawCall {
     pub rich_text: RichText,
 }
 
-pub fn point_in_rect(
-    x: u16,
-    y: u16,
-    rect_x1: u16,
-    rect_y1: u16,
-    rect_x2: u16,
-    rect_y2: u16,
-) -> bool {
-    x >= rect_x1 && x <= rect_x2 && y >= rect_y1 && y <= rect_y2
+pub fn point_in_rect(px: u16, py: u16, x: u16, y: u16, w: u16, h: u16) -> bool {
+    px >= x && px < x + w && py >= y && py < y + h
 }
 
 pub fn diff_buffers<'a>(old: &'a ScreenBuffer, new: &'a ScreenBuffer) -> Vec<(u16, u16, &'a Cell)> {

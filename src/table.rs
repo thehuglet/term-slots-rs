@@ -1,11 +1,11 @@
 use crate::{
+    card::{Card, draw_calls_playing_card_big},
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, TABLE_CARD_X_SPACING,
         TABLE_SLOT_COUNT,
     },
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation},
-    card::{Card, draw_calls_playing_card_big},
     poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
     utils::iter_some,
@@ -18,8 +18,6 @@ pub struct Table {
 
 pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
     for (index, card) in iter_some(&ctx.table.cards_on_table) {
-        let card: &Card = &card;
-
         let n: u16 = index as u16;
         let card_x: u16 = x + n * TABLE_CARD_X_SPACING;
         let card_y: u16 = y;

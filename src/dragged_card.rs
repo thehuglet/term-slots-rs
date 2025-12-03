@@ -33,13 +33,18 @@ pub fn get_valid_drop_destination(
         // Table checks
         let x1: u16 = TABLE_ORIGIN_X + table_slot_index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
         let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Table { index } if *index == table_slot_index);
         // let destination_is_locked: bool = !matches!(ctx.slots.state, SlotsState::Idle);
         let destination_is_locked: bool = false;
-        let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
+        let hitbox_check_failed: bool = !point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        );
 
         if destination_is_locked {
             continue;
@@ -58,11 +63,16 @@ pub fn get_valid_drop_destination(
         // Hand checks
         let x1: u16 = HAND_ORIGIN_X + hand_slot_index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
         let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Hand { index } if *index == hand_slot_index);
-        let hitbox_check_failed: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
+        let hitbox_check_failed: bool = !point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        );
 
         if destination_is_source || hitbox_check_failed {
             continue;

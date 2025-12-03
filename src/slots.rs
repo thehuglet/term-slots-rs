@@ -14,7 +14,7 @@ pub enum SlotsState {
 
 pub struct Slots {
     pub state: SlotsState,
-    pub spin_count: u32,
+    pub spin_count: i32,
     pub columns: Vec<Column>,
 }
 
@@ -27,12 +27,12 @@ pub struct Column {
     pub spin_speed: f32,
 }
 
-pub fn build_spin_cost_lut(max_spins: usize) -> Vec<u32> {
+pub fn build_spin_cost_lut(max_spins: usize) -> Vec<i32> {
     let base: f32 = 5.0;
     let growth: f32 = 1.3;
     let divisor: f32 = 3.0;
 
-    let mut lut: Vec<u32> = Vec::with_capacity(max_spins);
+    let mut lut: Vec<i32> = Vec::with_capacity(max_spins);
 
     for spin in 0..max_spins {
         let cost: f32 = if spin == 0 {
@@ -41,18 +41,18 @@ pub fn build_spin_cost_lut(max_spins: usize) -> Vec<u32> {
             let exp: f32 = spin as f32 / divisor; // spin, not spin-1
             base * growth.powf(exp)
         };
-        lut.push(cost.round() as u32);
+        lut.push(cost.round() as i32);
     }
 
     lut
 }
 
-pub fn spin_cost(spin_count: u32, lut: &[u32]) -> u32 {
+pub fn spin_cost(spin_count: i32, lut: &[i32]) -> i32 {
     let cost_index: usize = spin_count as usize;
     lut.get(cost_index).copied().unwrap_or_else(|| {
-        let last: u32 = *lut.last().unwrap_or(&5);
+        let last: i32 = *lut.last().unwrap_or(&5);
         let extra: usize = spin_count as usize - (lut.len() - 1);
-        (last as f64 * 1.3f64.powf(extra as f64 / 3.0)).round() as u32
+        (last as f32 * 1.3f32.powf(extra as f32 / 3.0)).round() as i32
     })
 }
 
@@ -201,8 +201,8 @@ pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots,
                     ctx.mouse.y,
                     column_x,
                     column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-                    column_x + 2,
-                    column_y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
+                    SLOTS_COLUMNS_X_SPACING,
+                    1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2, // center + top neighbors + bottom_neighbors
                 );
 
                 if is_hovering {
@@ -265,10 +265,7 @@ fn draw_column(
         let card_y_signed: i16 = y as i16 + row_offset;
         debug_assert!(
             card_y_signed >= 0,
-            "Slots Y position would be negative: {} + {} = {}",
-            y,
-            row_offset,
-            card_y_signed
+            "Slots Y position would be negative: {y} + {row_offset} = {card_y_signed}"
         );
 
         let card_x: u16 = x;

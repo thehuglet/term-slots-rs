@@ -48,7 +48,7 @@ use crate::{
     },
     shader::{apply_gamma, apply_vignette, draw_bg_shader},
     slots::{
-        Column, SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
+        SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
         draw_slots_panel, get_column_card_index, slots_are_spinning,
         slots_center_row_indexes_matching_card, spin_cost, spin_slots_column,
     },
@@ -118,11 +118,7 @@ fn main() -> io::Result<()> {
     //     },
     // });
 
-    for (index, column) in ctx.slots.columns.iter_mut().enumerate() {
-        // if index < 3 {
-        //     continue;
-        // }
-
+    for column in ctx.slots.columns.iter_mut() {
         column.cards.shuffle(&mut rand::rng());
     }
 
@@ -172,14 +168,12 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             }
 
             ctx.slots.state = SlotsState::Spinning;
-            ctx.coins = ctx
-                .coins
-                .saturating_sub(spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost) as i32);
+            ctx.coins -= spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost);
             ctx.slots.spin_count += 1;
         }),
         enabled_when: |ctx| {
-            matches!(ctx.slots.state, SlotsState::Idle)
-                && ctx.coins >= spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost) as i32
+            let spin_cost: i32 = spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost);
+            matches!(ctx.slots.state, SlotsState::Idle) && ctx.coins >= spin_cost
         },
     });
 
@@ -204,7 +198,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             }
 
             ctx.coins += coins_reward_total as i32;
-            ctx.score += coins_reward_total as u32;
+            ctx.score += coins_reward_total as i32;
 
             // Clear hand
             ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
