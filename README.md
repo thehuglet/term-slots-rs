@@ -6,7 +6,7 @@
    - **Windows**: `term-slots-windows.exe`
    - **Linux**: `term-slots-linux`
 2. Run it:
-   - **Windows**: Run `term-slots-windows.exe` or use `.\term-slots-windows.exe` in the terminal.
+   - **Windows**: Run `term-slots-windows.exe` or use `.\term-slots-windows.exe` in the terminal
    - **Linux**: `chmod +x term-slots-linux && ./term-slots-linux`
 
 ## CLI Args
