@@ -1,8 +1,5 @@
 use crate::{
-    constants::{
-        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, DEFAULT_CARD_BG_COLOR, SUIT_COLOR_BLACK,
-        SUIT_COLOR_RED,
-    },
+    constants::{DEFAULT_CARD_BG_COLOR, SUIT_COLOR_BLACK, SUIT_COLOR_RED},
     renderer::{DrawCall, Rgba, RichText},
 };
 

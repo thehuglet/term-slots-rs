@@ -56,7 +56,7 @@ pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) 
 }
 
 pub fn draw_hand_card_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
-    for n in 0..HAND_SLOT_COUNT as u16 {
+    for n in 0..HAND_SLOT_COUNT {
         draw_rect(
             draw_queue,
             (x + n * HAND_CARD_X_SPACING) as i16,

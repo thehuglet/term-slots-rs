@@ -23,7 +23,7 @@ use crossterm::{
 };
 use rand::seq::SliceRandom;
 use std::{
-    env,
+    cmp, env,
     io::{self, Stdout, Write},
 };
 
@@ -32,7 +32,7 @@ use crate::{
     constants::{
         HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
         SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT,
-        TERM_SCREEN_HEIGHT,
+        TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     },
     context::Context,
     dragged_card::{CardDragState, draw_dragged_card},
@@ -40,7 +40,7 @@ use crate::{
     fps_limiter::FPSLimiter,
     hand::{CardInHand, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
-    playing_card::{PlayingCard, Rank, Suit},
+    playing_card::PlayingCard,
     poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
     renderer::{
         Cell, DrawCall, Hsl, Rgba, RichText, build_crossterm_content_style, compose_buffer,
@@ -71,8 +71,10 @@ fn main() -> io::Result<()> {
         stdout,
         terminal::EnterAlternateScreen,
         terminal::DisableLineWrap,
+        EnableMouseCapture,
+        terminal::SetTitle("term-slots"),
         cursor::Hide,
-        EnableMouseCapture
+        terminal::SetSize(TERM_SCREEN_WIDTH, TERM_SCREEN_HEIGHT)
     )?;
 
     let mut ctx = Context {
@@ -87,19 +89,31 @@ fn main() -> io::Result<()> {
     // ctx.hand.cards_in_hand[0] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Heart,
-    //         rank: Rank::Ace,
+    //         rank: Rank::Num3,
+    //     },
+    // });
+    // ctx.hand.cards_in_hand[1] = Some(CardInHand {
+    //     card: PlayingCard {
+    //         suit: Suit::Spade,
+    //         rank: Rank::Num4,
     //     },
     // });
     // ctx.hand.cards_in_hand[2] = Some(CardInHand {
     //     card: PlayingCard {
-    //         suit: Suit::Spade,
-    //         rank: Rank::Ace,
+    //         suit: Suit::Club,
+    //         rank: Rank::Num5,
     //     },
     // });
-    // ctx.hand.cards_in_hand[5] = Some(CardInHand {
+    // ctx.hand.cards_in_hand[3] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Club,
-    //         rank: Rank::Ace,
+    //         rank: Rank::Num6,
+    //     },
+    // });
+    // ctx.hand.cards_in_hand[4] = Some(CardInHand {
+    //     card: PlayingCard {
+    //         suit: Suit::Club,
+    //         rank: Rank::Num7,
     //     },
     // });
 
@@ -175,10 +189,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                 .table
                 .cards_on_table
                 .iter()
-                .filter_map(|slot| {
-                    slot.as_ref()
-                        .map(|card_on_table| card_on_table.card.clone())
-                })
+                .filter_map(|slot| slot.as_ref().map(|card_on_table| card_on_table.card))
                 .collect();
 
             let (poker_hand, scoring_cards): (PokerHand, Vec<PlayingCard>) =
@@ -263,7 +274,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                 on_click: Box::new(move |ctx: &mut Context| {
                     ctx.slots.state = SlotsState::Idle;
                     let card_index: usize = get_column_card_index(0, &ctx.slots.columns[index]);
-                    let card: PlayingCard = ctx.slots.columns[index].cards[card_index].clone();
+                    let card: PlayingCard = ctx.slots.columns[index].cards[card_index];
 
                     // Find the first empty slot in hand
                     if let Some(empty_slot) = ctx
@@ -339,7 +350,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     );
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
 
-    draw_table_card_slots(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, ctx);
+    draw_table_card_slots(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y);
     draw_table(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, ctx);
 
     draw_hand_card_slots(&mut draw_queue, HAND_ORIGIN_X, HAND_ORIGIN_Y);
@@ -356,20 +367,27 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             .with_bold(true),
     });
 
-    // Coin drawing
+    // Used for aligning the currency symbols of all currency displays
+    let coin_display_width: u16 = format!("{}", ctx.coins).chars().count() as u16;
+    let luck_display_width: u16 = format!("{}", ctx.luck).chars().count() as u16;
+    let currency_width: u16 = cmp::max(coin_display_width, luck_display_width);
+
+    // Coin currency drawing
+    let coin_formatted = format!("$ {:>width$}", ctx.coins, width = currency_width as usize);
     draw_queue.push(DrawCall {
         x: SIDEBAR_BORDER_X + 3,
         y: 5,
-        rich_text: RichText::new(format!("{:>12}", format!("$ {}", ctx.coins)))
+        rich_text: RichText::new(format!("{:>12}", coin_formatted))
             .with_fg(Rgba::from_u8(255, 255, 155, 1.0))
             .with_bold(true),
     });
 
-    // Diamonds drawing
+    // Luck currency drawing
+    let luck_formatted = format!("# {:>width$}", ctx.luck, width = currency_width as usize);
     draw_queue.push(DrawCall {
         x: SIDEBAR_BORDER_X + 3,
         y: 6,
-        rich_text: RichText::new(format!("{:>12}", format!("☘ {}", ctx.luck)))
+        rich_text: RichText::new(format!("{:>12}", luck_formatted))
             .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
             .with_bold(true),
     });
@@ -377,10 +395,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     // Poker hand preview
     if let Some(poker_hand) = ctx.table.poker_hand {
         let text_centered: String = if matches!(poker_hand, PokerHand::HighCard) {
-            center_text_unicode(
-                format!("{poker_hand}", poker_hand = poker_hand.repr(),),
-                SIDEBAR_BORDER_X as usize,
-            )
+            center_text_unicode(poker_hand.repr().to_string(), SIDEBAR_BORDER_X as usize)
         } else {
             center_text_unicode(
                 format!(
@@ -427,6 +442,15 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             SetStyle(build_crossterm_content_style(cell)),
             Print(cell.ch),
             ResetColor,
+        )?;
+    }
+
+    ctx.resize_update_accumulator += dt;
+    if ctx.resize_update_accumulator >= 0.2 {
+        ctx.resize_update_accumulator = 0.0;
+        queue!(
+            stdout,
+            terminal::SetSize(TERM_SCREEN_WIDTH, TERM_SCREEN_HEIGHT)
         )?;
     }
 

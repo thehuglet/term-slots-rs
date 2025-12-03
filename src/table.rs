@@ -8,7 +8,6 @@ use crate::{
     playing_card::{PlayingCard, draw_calls_playing_card_big},
     poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
-    slots::SlotsState,
     utils::iter_some,
 };
 
@@ -59,7 +58,7 @@ pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context)
     }
 }
 
-pub fn draw_table_card_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
+pub fn draw_table_card_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
     for slot_index in 0..TABLE_SLOT_COUNT {
         let local_x: u16 = x + slot_index * TABLE_CARD_X_SPACING;
         // let locked: bool = !matches!(ctx.slots.state, SlotsState::Idle);

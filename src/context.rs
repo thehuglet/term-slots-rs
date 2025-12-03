@@ -22,6 +22,7 @@ pub struct Context {
     pub slots: Slots,
     pub table: Table,
     pub hand: Hand,
+    pub resize_update_accumulator: f32,
     pub fps_counter: FPSCounter,
 }
 
@@ -76,6 +77,7 @@ impl Default for Context {
                 hand_size: 7,
                 cards_in_hand: vec![],
             },
+            resize_update_accumulator: 0.0,
             fps_counter: FPSCounter::new(0.08),
         }
     }

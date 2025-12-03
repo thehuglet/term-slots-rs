@@ -1,4 +1,4 @@
-use std::{mem::take, process::exit, time::Duration};
+use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEventKind};
 
@@ -93,7 +93,7 @@ fn on_left_click_down(ctx: &mut Context) {
 
         if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
             ctx.mouse.card_drag = CardDragState::Dragging {
-                card: card_on_table.card.clone(),
+                card: card_on_table.card,
                 source: DragAndDropLocation::Table { index },
             };
         }
@@ -107,7 +107,7 @@ fn on_left_click_down(ctx: &mut Context) {
 
         if point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2) {
             ctx.mouse.card_drag = CardDragState::Dragging {
-                card: card_in_hand.card.clone(),
+                card: card_in_hand.card,
                 source: DragAndDropLocation::Hand { index },
             };
         }
@@ -152,7 +152,7 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
 fn on_right_click_down(ctx: &mut Context) {
     // Check if clicked on a table card first (Table -> Hand)
     for table_slot_index in 0..TABLE_SLOT_COUNT {
-        let x1: u16 = TABLE_ORIGIN_X + table_slot_index as u16 * HAND_CARD_X_SPACING;
+        let x1: u16 = TABLE_ORIGIN_X + table_slot_index * HAND_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
         let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
         let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
@@ -198,7 +198,7 @@ fn on_right_click_down(ctx: &mut Context) {
 
     // Check if clicked on a hand card (Hand -> Table)
     for hand_slot_index in 0..HAND_SLOT_COUNT {
-        let x1: u16 = HAND_ORIGIN_X + hand_slot_index as u16 * HAND_CARD_X_SPACING;
+        let x1: u16 = HAND_ORIGIN_X + hand_slot_index * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
         let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
         let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;

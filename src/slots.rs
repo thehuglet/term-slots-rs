@@ -187,43 +187,16 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
 }
 
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
-    let any_column_hovered: bool = (0..slots.columns.len()).any(|column_index| {
-        let local_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
-
-        point_in_rect(
-            ctx.mouse.x,
-            ctx.mouse.y,
-            local_x,
-            y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-            local_x + 2,
-            y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
-        )
-    });
-
     for (col_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = col_index as u16;
         let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;
 
-        draw_column(
-            draw_queue,
-            column_x,
-            column_y,
-            column,
-            ctx,
-            any_column_hovered,
-        );
+        draw_column(draw_queue, column_x, column_y, column, ctx);
     }
 }
 
-fn draw_column(
-    draw_queue: &mut Vec<DrawCall>,
-    x: u16,
-    y: u16,
-    column: &Column,
-    ctx: &Context,
-    any_column_hovered: bool,
-) {
+fn draw_column(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, column: &Column, ctx: &Context) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_column_card_index(row_offset, column);
         let card: &PlayingCard = &column.cards[card_index];

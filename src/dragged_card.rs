@@ -6,9 +6,8 @@ use crate::{
     context::Context,
     hand::CardInHand,
     playing_card::{PlayingCard, draw_calls_playing_card_big},
-    poker_hand::{PokerHand, update_current_poker_hand},
+    poker_hand::update_current_poker_hand,
     renderer::{DrawCall, Rgba, draw_rect, point_in_rect},
-    slots::SlotsState,
     table::CardOnTable,
 };
 
