@@ -2,10 +2,10 @@
 
 ## Running the Game
 
-1. Grab the latest binary from [Releases](https://github.com/thehuglet/term-slots-rs/releases)
+1. Grab the latest binary from [releases](https://github.com/thehuglet/term-slots-rs/releases):
    - **Windows**: `term-slots-windows.exe`
    - **Linux**: `term-slots-linux`
-2. Run it
+2. Run it:
    - **Windows**: Run `term-slots-windows.exe` or use `.\term-slots-windows.exe` in the terminal.
    - **Linux**: `chmod +x term-slots-linux && ./term-slots-linux`
 
