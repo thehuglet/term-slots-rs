@@ -49,6 +49,10 @@ jobs:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: ./artifacts
@@ -56,12 +60,14 @@ jobs:
       - name: Create source archives
         run: |
           VERSION="${GITHUB_REF#refs/tags/v}"
-          tar --exclude='./target' \
-              --exclude='./.git' \
-              -czf "term-slots-${VERSION}-src.tar.gz" .
-          zip -r "term-slots-${VERSION}-src.zip" . \
-            -x "target/*" \
-            -x ".git/*"
+
+          git archive --format=tar.gz --prefix=term-slots-$VERSION/ HEAD \
+            -o "term-slots-${VERSION}-src.tar.gz"
+
+          git archive --format=zip --prefix=term-slots-$VERSION/ HEAD \
+            -o "term-slots-${VERSION}-src.zip"
+
+          # Create checksums
           sha256sum term-slots-* > SHA256SUMS.txt
 
       - name: Create Release
