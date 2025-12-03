@@ -1,10 +1,10 @@
 # term-slots-rs
 
-> Spin the slots, pick the cards and play the poker hands!
-
 [![Rust Badge](https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![CI Badge](https://img.shields.io/github/actions/workflow/status/thehuglet/term-slots-rs/release.yml)](https://github.com/thehuglet/term-slots-rs/actions)
 [![Repo Badge](https://img.shields.io/badge/repo-thehuglet/term--slots--rs-1370D3?style=flat-square&logo=github)](https://github.com/thehuglet/term-slots-rs)
+
+> Spin the slots, pick the cards and play the poker hands!
 
 ![Release Header](https://github.com/thehuglet/term-slots-rs/blob/main/assets/release-header.png)
 
