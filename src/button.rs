@@ -10,6 +10,7 @@ pub struct Button {
     pub x: u16,
     pub y: u16,
     pub w: u16,
+    pub h: u16,
     pub text: String,
     pub color: Rgba,
     pub on_click: Box<dyn Fn(&mut Context)>,
@@ -19,7 +20,7 @@ pub struct Button {
 pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
     for button in buttons {
         let button_x2: u16 = button.x + button.w - 1;
-        let button_y2: u16 = button.y;
+        let button_y2: u16 = button.y + button.h - 1;
 
         if point_in_rect(x, y, button.x, button.y, button_x2, button_y2) {
             return Some(button);
@@ -31,7 +32,7 @@ pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
 
 pub fn draw_button(draw_queue: &mut Vec<DrawCall>, ctx: &Context, button: &Button) {
     let w: u16 = button.w;
-    let h: u16 = 1;
+    let h: u16 = button.h;
 
     draw_rect(
         draw_queue,

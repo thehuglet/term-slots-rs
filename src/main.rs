@@ -31,8 +31,8 @@ use crate::{
     button::{Button, draw_button},
     constants::{
         HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
-        SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT,
-        TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
+        SLOTS_NEIGHBOR_ROW_COUNT, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
+        TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     },
     context::Context,
     dragged_card::{CardDragState, draw_dragged_card},
@@ -117,7 +117,11 @@ fn main() -> io::Result<()> {
     //     },
     // });
 
-    for column in &mut ctx.slots.columns {
+    for (index, column) in ctx.slots.columns.iter_mut().enumerate() {
+        if index < 3 {
+            continue;
+        }
+
         column.cards.shuffle(&mut rand::rng());
     }
 
@@ -153,6 +157,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         x: SIDEBAR_BORDER_X + 3,
         y: 9,
         w: 12,
+        h: 1,
         text: format!(
             "${cost} SPIN",
             cost = spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost)
@@ -182,6 +187,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         x: SIDEBAR_BORDER_X + 3,
         y: 14,
         w: 12,
+        h: 1,
         text: "PLAY".to_string(),
         color: Rgba::from_u8(160, 210, 140, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
@@ -226,6 +232,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         x: SIDEBAR_BORDER_X + 3,
         y: 16,
         w: 12,
+        h: 1,
         text: "BURN".to_string(),
         color: Rgba::from_u8(255, 120, 80, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
@@ -244,15 +251,15 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         },
     });
 
-    // Slots post-spin selection buttons
-    let cards_in_hand_count = ctx
+    // Slots post-spin reward buttons
+    let cards_in_hand_count: usize = ctx
         .hand
         .cards_in_hand
         .iter()
         .filter(|opt| opt.is_some())
         .count();
 
-    let cards_on_table_count = ctx
+    let cards_on_table_count: usize = ctx
         .table
         .cards_on_table
         .iter()
@@ -264,11 +271,12 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         && cards_in_hand_count < HAND_SLOT_COUNT.into()
     {
         for column_index in 0..ctx.slots.columns.len() {
-            let index = column_index;
+            let index: usize = column_index;
             buttons.push(Button {
                 x: SLOTS_ORIGIN_X + column_index as u16 * SLOTS_COLUMNS_X_SPACING,
-                y: SLOTS_ORIGIN_Y,
+                y: SLOTS_ORIGIN_Y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
                 w: 3,
+                h: 1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2,
                 text: "".to_string(),
                 color: Rgba::from_u8(0, 0, 0, 0.0),
                 on_click: Box::new(move |ctx: &mut Context| {
