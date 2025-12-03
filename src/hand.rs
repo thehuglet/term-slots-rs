@@ -1,27 +1,22 @@
 use crate::{
+    card::{Card, draw_calls_playing_card_big},
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, HAND_CARD_X_SPACING,
         HAND_SLOT_COUNT,
     },
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation},
-    playing_card::{PlayingCard, draw_calls_playing_card_big},
     renderer::{DrawCall, Hsl, draw_rect},
     utils::iter_some,
 };
 
 pub struct Hand {
     pub hand_size: u8,
-    pub cards_in_hand: Vec<Option<CardInHand>>,
-}
-
-#[derive(Clone)]
-pub struct CardInHand {
-    pub card: PlayingCard,
+    pub cards_in_hand: Vec<Option<Card>>,
 }
 
 pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
-    for (index, card_in_hand) in iter_some(&ctx.hand.cards_in_hand) {
+    for (index, card) in iter_some(&ctx.hand.cards_in_hand) {
         let n: u16 = index as u16;
         let card_x: u16 = x + n * HAND_CARD_X_SPACING;
         let card_y: u16 = y;
@@ -38,7 +33,7 @@ pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) 
         }
 
         let mut draw_calls: Vec<DrawCall> =
-            draw_calls_playing_card_big(card_x as i16, card_y as i16, &card_in_hand.card);
+            draw_calls_playing_card_big(card_x as i16, card_y as i16, &card);
 
         for dc in &mut draw_calls {
             let mut fg_hsl: Hsl = dc.rich_text.fg.into();

@@ -5,7 +5,7 @@ use crate::{
     },
     context::Context,
     dragged_card::{CardDragState, DragAndDropLocation},
-    playing_card::{PlayingCard, draw_calls_playing_card_big},
+    card::{Card, draw_calls_playing_card_big},
     poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
     utils::iter_some,
@@ -13,17 +13,12 @@ use crate::{
 
 pub struct Table {
     pub poker_hand: Option<PokerHand>,
-    pub cards_on_table: Vec<Option<CardOnTable>>,
-}
-
-#[derive(Clone)]
-pub struct CardOnTable {
-    pub card: PlayingCard,
+    pub cards_on_table: Vec<Option<Card>>,
 }
 
 pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
-    for (index, card_on_table) in iter_some(&ctx.table.cards_on_table) {
-        let card: &PlayingCard = &card_on_table.card;
+    for (index, card) in iter_some(&ctx.table.cards_on_table) {
+        let card: &Card = &card;
 
         let n: u16 = index as u16;
         let card_x: u16 = x + n * TABLE_CARD_X_SPACING;

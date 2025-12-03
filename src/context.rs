@@ -1,9 +1,9 @@
 use crate::{
+    card::standard_52_deck,
     constants::{SLOTS_MAX_COLUMN_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH},
     dragged_card::CardDragState,
     fps_counter::FPSCounter,
     hand::Hand,
-    playing_card::standard_52_deck,
     renderer::Screen,
     shader::{build_gamma_lut, build_vignette_lut},
     slots::{Column, Slots, build_spin_cost_lut},

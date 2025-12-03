@@ -1,4 +1,5 @@
 mod button;
+mod card;
 mod constants;
 mod context;
 mod dragged_card;
@@ -6,7 +7,6 @@ mod fps_counter;
 mod fps_limiter;
 mod hand;
 mod input;
-mod playing_card;
 mod poker_hand;
 mod renderer;
 mod shader;
@@ -29,6 +29,7 @@ use std::{
 
 use crate::{
     button::{Button, draw_button},
+    card::Card,
     constants::{
         HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
         SLOTS_NEIGHBOR_ROW_COUNT, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
@@ -38,9 +39,8 @@ use crate::{
     dragged_card::{CardDragState, draw_dragged_card},
     fps_counter::draw_fps_counter,
     fps_limiter::FPSLimiter,
-    hand::{CardInHand, draw_hand, draw_hand_card_slots},
+    hand::{draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
-    playing_card::PlayingCard,
     poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
     renderer::{
         Cell, DrawCall, Hsl, Rgba, RichText, build_crossterm_content_style, compose_buffer,
@@ -192,15 +192,9 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         text: "PLAY".to_string(),
         color: Rgba::from_u8(160, 210, 140, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
-            let table_cards: Vec<PlayingCard> = ctx
-                .table
-                .cards_on_table
-                .iter()
-                .filter_map(|slot| slot.as_ref().map(|card_on_table| card_on_table.card))
-                .collect();
+            let table_cards: Vec<&Card> = ctx.table.cards_on_table.iter().flatten().collect();
 
-            let (poker_hand, scoring_cards): (PokerHand, Vec<PlayingCard>) =
-                eval_poker_hand(&table_cards);
+            let (poker_hand, scoring_cards): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
 
             let mut coins_reward_total: u16 = poker_hand.coin_value() as u16;
 
@@ -292,7 +286,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                         column.cards[card_index]
                     };
 
-                    let matching_cards: Vec<PlayingCard> =
+                    let matching_cards: Vec<Card> =
                         slots_center_row_indexes_matching_card(&initial_card, ctx)
                             .into_iter()
                             .map(|col_idx| {
@@ -309,7 +303,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                             .iter_mut()
                             .find(|slot| slot.is_none())
                         {
-                            *empty_slot = Some(CardInHand { card });
+                            *empty_slot = Some(card);
                         } else {
                             // No more empty slots
                             break;

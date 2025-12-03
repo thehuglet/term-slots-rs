@@ -1,8 +1,8 @@
 use crate::{
+    card::{Card, draw_calls_playing_card_small},
     constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
     context::Context,
     dragged_card::CardDragState,
-    playing_card::{PlayingCard, draw_calls_playing_card_small},
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
 };
 
@@ -21,7 +21,7 @@ pub struct Slots {
 #[derive(Clone)]
 pub struct Column {
     pub cursor: f32,
-    pub cards: Vec<PlayingCard>,
+    pub cards: Vec<Card>,
     pub spin_duration: f32,
     pub spin_time_remaining: f32,
     pub spin_speed: f32,
@@ -187,34 +187,34 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
 }
 
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
-    let maybe_hovered_card: Option<(usize, &PlayingCard)> = ctx
-        .slots
-        .columns
-        .iter()
-        .enumerate()
-        .find_map(|(column_index, column)| {
-            let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
-            let column_y: u16 = y;
+    let maybe_hovered_card: Option<(usize, &Card)> =
+        ctx.slots
+            .columns
+            .iter()
+            .enumerate()
+            .find_map(|(column_index, column)| {
+                let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
+                let column_y: u16 = y;
 
-            let is_hovering: bool = point_in_rect(
-                ctx.mouse.x,
-                ctx.mouse.y,
-                column_x,
-                column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-                column_x + 2,
-                column_y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
-            );
+                let is_hovering: bool = point_in_rect(
+                    ctx.mouse.x,
+                    ctx.mouse.y,
+                    column_x,
+                    column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
+                    column_x + 2,
+                    column_y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
+                );
 
-            if is_hovering {
-                let card_index = get_column_card_index(0, column);
-                column
-                    .cards
-                    .get(card_index)
-                    .map(|card| (column_index, card))
-            } else {
-                None
-            }
-        });
+                if is_hovering {
+                    let card_index = get_column_card_index(0, column);
+                    column
+                        .cards
+                        .get(card_index)
+                        .map(|card| (column_index, card))
+                } else {
+                    None
+                }
+            });
 
     for (column_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = column_index as u16;
@@ -227,7 +227,7 @@ pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots,
         };
 
         let is_matching_hovered: bool = if let Some(hovered_card) = maybe_hovered_card {
-            let hovered_card: &PlayingCard = hovered_card.1;
+            let hovered_card: &Card = hovered_card.1;
             let matching_indexes: Vec<usize> =
                 slots_center_row_indexes_matching_card(hovered_card, ctx);
             matching_indexes.contains(&column_index)
@@ -258,7 +258,7 @@ fn draw_column(
 ) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_column_card_index(row_offset, column);
-        let card: &PlayingCard = &column.cards[card_index];
+        let card: &Card = &column.cards[card_index];
 
         // If `y` is ever negative, the slots are drawn too high up, in which case that's a developer mistake.
         // `debug_assert!` is fine here as the code should never ship with the described case.
@@ -342,17 +342,14 @@ pub fn draw_slots_column_shadows(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16)
     }
 }
 
-pub fn slots_center_row_indexes_matching_card(
-    target_card: &PlayingCard,
-    ctx: &Context,
-) -> Vec<usize> {
+pub fn slots_center_row_indexes_matching_card(target_card: &Card, ctx: &Context) -> Vec<usize> {
     ctx.slots
         .columns
         .iter()
         .enumerate()
         .filter_map(|(col_idx, column)| {
             let center_card_index: usize = get_column_card_index(0, column);
-            let card: &PlayingCard = &column.cards[center_card_index];
+            let card: &Card = &column.cards[center_card_index];
 
             let ranks_match: bool = card.rank == target_card.rank;
             // let suits_match: bool = card.suit == target_card.suit;

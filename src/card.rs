@@ -110,12 +110,12 @@ impl Rank {
 }
 
 #[derive(Clone, Copy)]
-pub struct PlayingCard {
+pub struct Card {
     pub suit: Suit,
     pub rank: Rank,
 }
 
-pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &PlayingCard) -> DrawCall {
+pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &Card) -> DrawCall {
     let suit_repr: &'static str = card.suit.repr();
     let rank_repr: &'static str = card.rank.repr();
     let suit_color: Rgba = card.suit.color();
@@ -133,7 +133,7 @@ pub fn draw_calls_playing_card_small(x: u16, y: u16, card: &PlayingCard) -> Draw
     }
 }
 
-pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &PlayingCard) -> Vec<DrawCall> {
+pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &Card) -> Vec<DrawCall> {
     let mut draw_calls: Vec<DrawCall> = vec![];
 
     let suit_repr: &'static str = card.suit.repr();
@@ -204,8 +204,8 @@ pub fn draw_calls_playing_card_big(x: i16, y: i16, card: &PlayingCard) -> Vec<Dr
     draw_calls
 }
 
-pub fn standard_52_deck() -> Vec<PlayingCard> {
+pub fn standard_52_deck() -> Vec<Card> {
     Suit::iter()
-        .flat_map(|suit| Rank::iter().map(move |rank| PlayingCard { suit, rank }))
+        .flat_map(|suit| Rank::iter().map(move |rank| Card { suit, rank }))
         .collect()
 }

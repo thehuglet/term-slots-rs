@@ -1,8 +1,8 @@
 use std::cmp::Reverse;
 
 use crate::{
+    card::{Card, Rank, Suit},
     context::Context,
-    playing_card::{PlayingCard, Rank, Suit},
 };
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
@@ -108,29 +108,25 @@ fn rank_straight_value(rank: Rank) -> i32 {
 
 /// A helper wrapper that makes updating the current poker hand easier
 pub fn update_current_poker_hand(ctx: &mut Context) {
-    let table_cards: Vec<PlayingCard> = ctx
-        .table
-        .cards_on_table
-        .iter()
-        .filter_map(|slot| slot.as_ref().map(|card_on_table| card_on_table.card))
-        .collect();
+    let table_cards: Vec<&Card> = ctx.table.cards_on_table.iter().flatten().collect();
 
     if table_cards.is_empty() {
         ctx.table.poker_hand = None;
         return;
     }
 
-    let (poker_hand, _): (PokerHand, Vec<PlayingCard>) = eval_poker_hand(&table_cards);
+    let (poker_hand, _): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
     ctx.table.poker_hand = Some(poker_hand);
 }
 
-pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
+pub fn eval_poker_hand(cards_: &[&Card]) -> (PokerHand, Vec<Card>) {
+    let cards: Vec<Card> = cards_.iter().map(|c| **c).collect();
     let mut suit_counts: [u8; 4] = [0u8; 4];
     let mut rank_counts: [u8; 13] = [0u8; 13];
-    let mut cards_by_suit: Vec<Vec<PlayingCard>> = vec![Vec::new(); 4];
-    let mut cards_by_rank: Vec<Vec<PlayingCard>> = vec![Vec::new(); 13];
+    let mut cards_by_suit: Vec<Vec<Card>> = vec![Vec::new(); 4];
+    let mut cards_by_rank: Vec<Vec<Card>> = vec![Vec::new(); 13];
 
-    for card in cards {
+    for card in &cards {
         let suit_index: usize = suit_to_index(card.suit);
         let rank_index: usize = rank_to_index(card.rank);
 
@@ -142,12 +138,12 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
 
     // Find flush suit and cards (if any)
     let mut flush_suit: Option<usize> = None;
-    let mut flush_cards: Vec<PlayingCard> = Vec::with_capacity(5);
+    let mut flush_cards: Vec<Card> = Vec::with_capacity(5);
 
     for (index, &count) in suit_counts.iter().enumerate() {
         if count >= 5 {
             flush_suit = Some(index);
-            let mut suit_cards: Vec<PlayingCard> = cards_by_suit[index].clone();
+            let mut suit_cards: Vec<Card> = cards_by_suit[index].clone();
             // Sort descending by rank
             suit_cards.sort_by_key(|card| Reverse(card.rank));
             flush_cards = suit_cards.into_iter().take(5).collect();
@@ -186,7 +182,7 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
     }
 
     // Check for straight
-    let straight_info: StraightInfo = check_straight(cards);
+    let straight_info: StraightInfo = check_straight(&cards);
 
     // Check for royal flush
     let is_royal_flush = is_flush && straight_info.is_straight && {
@@ -209,8 +205,7 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
 
     // 3. Five of a Kind
     if has_five && let Some(rank_index) = best_five_rank_index {
-        let five_cards: Vec<PlayingCard> =
-            cards_by_rank[rank_index].iter().take(5).cloned().collect();
+        let five_cards: Vec<Card> = cards_by_rank[rank_index].iter().take(5).cloned().collect();
         return (PokerHand::FiveOfAKind, five_cards);
     }
 
@@ -226,7 +221,7 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
 
     // 6. Four of a Kind
     if has_four && let Some(rank_index) = best_four_rank_index {
-        let four_cards: Vec<PlayingCard> = cards_by_rank[rank_index]
+        let four_cards: Vec<Card> = cards_by_rank[rank_index]
             .iter()
             .take(4)
             .cloned()
@@ -236,7 +231,7 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
 
     // 7. Full House
     if has_three && pair_count >= 1 {
-        let mut full_house_cards: Vec<PlayingCard> = Vec::with_capacity(5);
+        let mut full_house_cards: Vec<Card> = Vec::with_capacity(5);
 
         // Get three of a kind
         if let Some(three_rank_index) = best_three_rank_index {
@@ -279,7 +274,7 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
         let first_pair_rank_index: usize = pair_rank_indices[0]; // Lowest index = highest rank
         let second_pair_rank_index: usize = pair_rank_indices[1];
 
-        let mut two_pair_cards: Vec<PlayingCard> = Vec::with_capacity(5);
+        let mut two_pair_cards: Vec<Card> = Vec::with_capacity(5);
         two_pair_cards.extend(cards_by_rank[first_pair_rank_index].iter().take(2).cloned());
         two_pair_cards.extend(
             cards_by_rank[second_pair_rank_index]
@@ -304,17 +299,17 @@ pub fn eval_poker_hand(cards: &[PlayingCard]) -> (PokerHand, Vec<PlayingCard>) {
     }
 
     // 13. High Card
-    let highest_card: PlayingCard = cards.iter().max_by_key(|card| card.rank).cloned().unwrap();
+    let highest_card: Card = cards.iter().max_by_key(|card| card.rank).cloned().unwrap();
 
     (PokerHand::HighCard, vec![highest_card])
 }
 
 struct StraightInfo {
     is_straight: bool,
-    cards: Vec<PlayingCard>,
+    cards: Vec<Card>,
 }
 
-fn check_straight(cards: &[PlayingCard]) -> StraightInfo {
+fn check_straight(cards: &[Card]) -> StraightInfo {
     // Convert to bitmask for fast straight checking
     let mut rank_present: [bool; 15] = [false; 15]; // Index 2-14 for ranks (2=2, 14=Ace high)
 
@@ -342,7 +337,7 @@ fn check_straight(cards: &[PlayingCard]) -> StraightInfo {
 
         if is_straight {
             // Build straight cards
-            let mut straight_cards: Vec<PlayingCard> = Vec::with_capacity(5);
+            let mut straight_cards: Vec<Card> = Vec::with_capacity(5);
             let straight_ranks: Vec<usize> = if high == 5 && ace_low_straight {
                 // Ace-low straight: A,2,3,4,5
                 vec![14, 2, 3, 4, 5]
