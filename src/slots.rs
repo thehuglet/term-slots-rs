@@ -187,23 +187,53 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
 }
 
 pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
-    for (col_index, column) in slots.columns.iter().enumerate() {
-        let n: u16 = col_index as u16;
+    let maybe_hovered_card: Option<(usize, &PlayingCard)> = ctx
+        .slots
+        .columns
+        .iter()
+        .enumerate()
+        .find_map(|(column_index, column)| {
+            let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
+            let column_y: u16 = y;
+
+            let is_hovering: bool = point_in_rect(
+                ctx.mouse.x,
+                ctx.mouse.y,
+                column_x,
+                column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
+                column_x + 2,
+                column_y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
+            );
+
+            if is_hovering {
+                let card_index = get_column_card_index(0, column);
+                column
+                    .cards
+                    .get(card_index)
+                    .map(|card| (column_index, card))
+            } else {
+                None
+            }
+        });
+
+    for (column_index, column) in slots.columns.iter().enumerate() {
+        let n: u16 = column_index as u16;
         let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;
 
-        // We only care about the center row being clickable which makes this simpler
-        // this also considers the slot below for the hitbox for accessibility
-        let is_center_row_hovered: bool = point_in_rect(
-            ctx.mouse.x,
-            ctx.mouse.y,
-            column_x,
-            column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-            column_x + 2,
-            column_y + SLOTS_NEIGHBOR_ROW_COUNT as u16,
-        );
+        let is_hovered: bool = match maybe_hovered_card {
+            Some(hovered_card) => column_index == hovered_card.0,
+            None => false,
+        };
 
-        // let hovered_column_index: Option<usize> = if is_column_hovered { Some(1) } else { None };
+        let is_matching_hovered: bool = if let Some(hovered_card) = maybe_hovered_card {
+            let hovered_card: &PlayingCard = hovered_card.1;
+            let matching_indexes: Vec<usize> =
+                slots_center_row_indexes_matching_card(hovered_card, ctx);
+            matching_indexes.contains(&column_index)
+        } else {
+            false
+        };
 
         draw_column(
             draw_queue,
@@ -211,8 +241,8 @@ pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots,
             column_y,
             column,
             ctx,
-            is_center_row_hovered,
-            // &[],
+            is_hovered,
+            is_matching_hovered,
         );
     }
 }
@@ -223,8 +253,8 @@ fn draw_column(
     y: u16,
     column: &Column,
     ctx: &Context,
-    is_center_row_hovered: bool,
-    // matching_column_indexes: &[usize],
+    is_hovered: bool,
+    is_matching_hovered: bool,
 ) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_column_card_index(row_offset, column);
@@ -246,18 +276,6 @@ fn draw_column(
 
         let mut card_draw_calls: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
 
-        // // "Interact with me" flashing post-spin
-        // if !any_column_hovered {
-        //     // let peak: f32 = 0.4;
-        //     // let frequency: f32 = 7.0;
-        //     // let t: f32 = ((frequency * ctx.game_time).sin() * 0.5 + 0.5) * peak;
-        //     let t: f32 = 0.5;
-        //     let flash_color = Rgba::from_f32(0.5, 0.5, 0.0, 1.0);
-
-        //     card.rich_text.fg = card.rich_text.fg.lerp(flash_color, t * 0.75);
-        //     card.rich_text.bg = card.rich_text.bg.lerp(flash_color, t);
-        // }
-
         if row_offset == 0 {
             if matches!(ctx.slots.state, SlotsState::PostSpin) {
                 let interact_with_me_color = Rgba::from_f32(1.0, 1.0, 0.3, 1.0);
@@ -271,11 +289,20 @@ fn draw_column(
 
                 let not_dragging: bool = matches!(ctx.mouse.card_drag, CardDragState::NotDragging);
 
-                if is_center_row_hovered && not_dragging {
+                if is_hovered && not_dragging {
+                    // Hovered card highlighting
                     card_draw_calls.rich_text.fg =
-                        card_draw_calls.rich_text.fg.lerp(highlight_color, 0.5);
+                        card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
                     card_draw_calls.rich_text.bg =
-                        card_draw_calls.rich_text.bg.lerp(highlight_color, 0.8);
+                        card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
+                }
+
+                if is_matching_hovered {
+                    // Matching card highlighting
+                    card_draw_calls.rich_text.fg =
+                        card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
+                    card_draw_calls.rich_text.bg =
+                        card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
                 }
 
                 // Matching cards highlighting
@@ -315,22 +342,22 @@ pub fn draw_slots_column_shadows(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16)
     }
 }
 
-// fn slots_center_row_indexes_matching_card(target_card: &PlayingCard, ctx: &Context) -> Vec<usize> {
-//     ctx.slots
-//         .columns
-//         .iter()
-//         .filter_map(|column| {
-//             let column_index: usize = get_column_card_index(0, column);
-//             let card: &PlayingCard = &column.cards[column_index];
+pub fn slots_center_row_indexes_matching_card(
+    target_card: &PlayingCard,
+    ctx: &Context,
+) -> Vec<usize> {
+    ctx.slots
+        .columns
+        .iter()
+        .enumerate()
+        .filter_map(|(col_idx, column)| {
+            let center_card_index: usize = get_column_card_index(0, column);
+            let card: &PlayingCard = &column.cards[center_card_index];
 
-//             let ranks_match: bool = card.rank == target_card.rank;
-//             let suits_match: bool = card.suit == target_card.suit;
+            let ranks_match: bool = card.rank == target_card.rank;
+            // let suits_match: bool = card.suit == target_card.suit;
 
-//             if ranks_match || suits_match {
-//                 Some(column_index)
-//             } else {
-//                 None
-//             }
-//         })
-//         .collect()
-// }
+            if ranks_match { Some(col_idx) } else { None }
+        })
+        .collect()
+}

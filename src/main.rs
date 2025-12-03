@@ -48,8 +48,9 @@ use crate::{
     },
     shader::{apply_gamma, apply_vignette, draw_bg_shader},
     slots::{
-        SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
-        draw_slots_panel, get_column_card_index, slots_are_spinning, spin_cost, spin_slots_column,
+        Column, SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
+        draw_slots_panel, get_column_card_index, slots_are_spinning,
+        slots_center_row_indexes_matching_card, spin_cost, spin_slots_column,
     },
     table::{draw_table, draw_table_card_slots},
     utils::center_text_unicode,
@@ -266,9 +267,12 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         .filter(|opt| opt.is_some())
         .count();
 
+    let at_least_one_empty_slot_in_hand: bool = cards_in_hand_count < HAND_SLOT_COUNT.into();
+    let no_cards_on_table: bool = cards_on_table_count == 0;
+
     if matches!(ctx.slots.state, SlotsState::PostSpin)
-        && cards_on_table_count == 0
-        && cards_in_hand_count < HAND_SLOT_COUNT.into()
+        && at_least_one_empty_slot_in_hand
+        && no_cards_on_table
     {
         for column_index in 0..ctx.slots.columns.len() {
             let index: usize = column_index;
@@ -281,17 +285,35 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                 color: Rgba::from_u8(0, 0, 0, 0.0),
                 on_click: Box::new(move |ctx: &mut Context| {
                     ctx.slots.state = SlotsState::Idle;
-                    let card_index: usize = get_column_card_index(0, &ctx.slots.columns[index]);
-                    let card: PlayingCard = ctx.slots.columns[index].cards[card_index];
 
-                    // Find the first empty slot in hand
-                    if let Some(empty_slot) = ctx
-                        .hand
-                        .cards_in_hand
-                        .iter_mut()
-                        .find(|slot| slot.is_none())
-                    {
-                        *empty_slot = Some(CardInHand { card });
+                    let initial_card = {
+                        let column = &ctx.slots.columns[index];
+                        let card_index = get_column_card_index(0, column);
+                        column.cards[card_index]
+                    };
+
+                    let matching_cards: Vec<PlayingCard> =
+                        slots_center_row_indexes_matching_card(&initial_card, ctx)
+                            .into_iter()
+                            .map(|col_idx| {
+                                let column = &ctx.slots.columns[col_idx];
+                                let card_idx = get_column_card_index(0, column);
+                                column.cards[card_idx]
+                            })
+                            .collect();
+
+                    for card in matching_cards {
+                        if let Some(empty_slot) = ctx
+                            .hand
+                            .cards_in_hand
+                            .iter_mut()
+                            .find(|slot| slot.is_none())
+                        {
+                            *empty_slot = Some(CardInHand { card });
+                        } else {
+                            // No more empty slots
+                            break;
+                        }
                     }
                 }),
                 enabled_when: |_| true,
