@@ -1,4 +1,4 @@
-name: Build and Release
+name: Release
 
 on:
   push:
@@ -6,76 +6,30 @@ on:
       - "v*"
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: term-slots-linux
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: term-slots-windows.exe
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Build
-        shell: bash
-        run: |
-          cargo build --release --target ${{ matrix.target }}
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv target/${{ matrix.target }}/release/term-slots.exe term-slots-windows.exe
-          else
-            mv target/${{ matrix.target }}/release/term-slots term-slots-linux
-          fi
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}
-
-  create-release:
-    needs: build
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Create source archives
+      - name: Build Linux binary
+        shell: bash
         run: |
-          VERSION="${GITHUB_REF#refs/tags/v}"
+          cargo build --release --target x86_64-unknown-linux-gnu
+          mv target/x86_64-unknown-linux-gnu/release/term-slots term-slots-linux
 
-          git archive --format=tar.gz --prefix=term-slots-$VERSION/ HEAD \
-            -o "term-slots-${VERSION}-src.tar.gz"
-
-          git archive --format=zip --prefix=term-slots-$VERSION/ HEAD \
-            -o "term-slots-${VERSION}-src.zip"
-
-          # Create checksums
-          sha256sum term-slots-* > SHA256SUMS.txt
+      - name: Build Windows binary
+        shell: bash
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+          cargo build --release --target x86_64-pc-windows-msvc
+          mv target/x86_64-pc-windows-msvc/release/term-slots.exe term-slots-windows.exe
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./artifacts/term-slots-linux
-            ./artifacts/term-slots-windows.exe
-            term-slots-*-src.tar.gz
-            term-slots-*-src.zip
-            SHA256SUMS.txt
+            term-slots-linux
+            term-slots-windows.exe
