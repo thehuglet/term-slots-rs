@@ -119,9 +119,9 @@ fn main() -> io::Result<()> {
     // });
 
     for (index, column) in ctx.slots.columns.iter_mut().enumerate() {
-        if index < 3 {
-            continue;
-        }
+        // if index < 3 {
+        //     continue;
+        // }
 
         column.cards.shuffle(&mut rand::rng());
     }
@@ -407,20 +407,20 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     draw_queue.push(DrawCall {
         x: SIDEBAR_BORDER_X + 3,
         y: 5,
-        rich_text: RichText::new(format!("{:>12}", coin_formatted))
+        rich_text: RichText::new(format!("{coin_formatted:>12}"))
             .with_fg(Rgba::from_u8(255, 255, 155, 1.0))
             .with_bold(true),
     });
 
     // Luck currency drawing
-    let luck_formatted = format!("# {:>width$}", ctx.luck, width = currency_width as usize);
-    draw_queue.push(DrawCall {
-        x: SIDEBAR_BORDER_X + 3,
-        y: 6,
-        rich_text: RichText::new(format!("{:>12}", luck_formatted))
-            .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
-            .with_bold(true),
-    });
+    // let luck_formatted = format!("# {:>width$}", ctx.luck, width = currency_width as usize);
+    // draw_queue.push(DrawCall {
+    //     x: SIDEBAR_BORDER_X + 3,
+    //     y: 6,
+    //     rich_text: RichText::new(format!("{:>12}", luck_formatted))
+    //         .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
+    //         .with_bold(true),
+    // });
 
     // Poker hand preview
     if let Some(poker_hand) = ctx.table.poker_hand {
@@ -475,6 +475,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         )?;
     }
 
+    // This doesnt work on linux for some reason
     ctx.resize_update_accumulator += dt;
     if ctx.resize_update_accumulator >= 0.2 {
         ctx.resize_update_accumulator = 0.0;

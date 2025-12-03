@@ -56,7 +56,7 @@ impl Default for Context {
             },
             game_time: 0.0,
             slots: Slots {
-                state: crate::slots::SlotsState::PostSpin,
+                state: crate::slots::SlotsState::Idle,
                 spin_count: 0,
                 columns: vec![
                     Column {
