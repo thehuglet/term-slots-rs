@@ -2,9 +2,7 @@
 
 > Spin the slots, pick the cards and play the poker hands!
 
-[![CI Badge]][CI]
-[![Rust Badge]][Rust]
-[![Repo Badge]][Repo]
+[![CI Badge]][CI] [![Rust Badge]][Rust] [![Repo Badge]][Repo]
 
 ![Release Header](https://github.com/thehuglet/term-slots-rs/blob/main/assets/release-header.png)
 
