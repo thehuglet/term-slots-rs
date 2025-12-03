@@ -13,12 +13,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: term-slots-linux # 👈 Changed to match download
-            output_name: term-slots-linux # 👈 Added for clarity
+            artifact_name: term-slots-linux
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: term-slots-windows.exe # 👈 Changed to match download
-            output_name: term-slots-windows.exe # 👈 Added for clarity
+            artifact_name: term-slots-windows.exe
 
     steps:
       - uses: actions/checkout@v4
@@ -29,19 +27,20 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build
+        shell: bash
         run: |
           cargo build --release --target ${{ matrix.target }}
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv target/${{ matrix.target }}/release/term-slots.exe ${{ matrix.output_name }}
+            mv target/${{ matrix.target }}/release/term-slots.exe term-slots-windows.exe
           else
-            mv target/${{ matrix.target }}/release/term-slots ${{ matrix.output_name }}
+            mv target/${{ matrix.target }}/release/term-slots term-slots-linux
           fi
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.output_name }}
+          path: ${{ matrix.artifact_name }}
 
   create-release:
     needs: build
@@ -56,23 +55,13 @@ jobs:
 
       - name: Create source archives
         run: |
-          # Get the version from the tag (remove 'v' prefix)
           VERSION="${GITHUB_REF#refs/tags/v}"
-
-          # Create clean source archives (exclude build artifacts)
-          # .tar.gz format
           tar --exclude='./target' \
               --exclude='./.git' \
-              --exclude='./.github/workflows/*.yml.bak' \
               -czf "term-slots-${VERSION}-src.tar.gz" .
-
-          # .zip format
           zip -r "term-slots-${VERSION}-src.zip" . \
             -x "target/*" \
-            -x ".git/*" \
-            -x "*.yml.bak"
-
-          # Create checksums
+            -x ".git/*"
           sha256sum term-slots-* > SHA256SUMS.txt
 
       - name: Create Release
