@@ -5,16 +5,16 @@ use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseButton
 use crate::{
     button::{Button, get_button_at},
     card::Card,
+    card_ops::{
+        CardDragAndDropLocation, CardDragState, delete_card_at, get_valid_drop_destination,
+        location_has_card, place_card_at, swap_cards_at,
+    },
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
         HAND_ORIGIN_Y, HAND_SLOT_COUNT, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
         TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     },
     context::Context,
-    dragged_card::{
-        CardDragState, DragAndDropLocation, delete_card_at, get_valid_drop_destination,
-        location_has_card, place_card_at, swap_cards_at,
-    },
     poker_hand::update_current_poker_hand,
     renderer::{Screen, point_in_rect},
     utils::iter_some,
@@ -84,7 +84,7 @@ fn on_left_click_down(ctx: &mut Context) {
 
     // Drag detection
     // > Table
-    for (index, card) in iter_some(&ctx.table.cards_on_table) {
+    for (index, card) in iter_some(&ctx.cards_on_table) {
         let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
 
@@ -98,12 +98,12 @@ fn on_left_click_down(ctx: &mut Context) {
         ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
-                source: DragAndDropLocation::Table { index },
+                source: CardDragAndDropLocation::Table { index },
             };
         }
     }
     // > Hand
-    for (index, card) in iter_some(&ctx.hand.cards_in_hand) {
+    for (index, card) in iter_some(&ctx.cards_in_hand) {
         let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
 
@@ -117,7 +117,7 @@ fn on_left_click_down(ctx: &mut Context) {
         ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
-                source: DragAndDropLocation::Hand { index },
+                source: CardDragAndDropLocation::Hand { index },
             };
         }
     }
@@ -140,7 +140,7 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
     }
 
     // Dropping (drag & drop)
-    let maybe_drag_data: Option<(crate::card::Card, DragAndDropLocation)> = match drag_state {
+    let maybe_drag_data: Option<(crate::card::Card, CardDragAndDropLocation)> = match drag_state {
         CardDragState::Dragging { card, source } => Some((card, source)),
         _ => None,
     };
@@ -162,18 +162,22 @@ fn on_right_click_down(ctx: &mut Context) {
     for table_slot_index in 0..TABLE_SLOT_COUNT {
         let x1: u16 = TABLE_ORIGIN_X + table_slot_index * HAND_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
-        let x2: u16 = x1 + BIG_PLAYING_CARD_WIDTH - 1;
-        let y2: u16 = y1 + BIG_PLAYING_CARD_HEIGHT - 1;
 
-        let hitbox_not_clicked: bool = !point_in_rect(ctx.mouse.x, ctx.mouse.y, x1, y1, x2, y2);
-        let source_slot_empty: bool = ctx.table.cards_on_table[table_slot_index as usize].is_none();
+        let hitbox_not_clicked: bool = !point_in_rect(
+            ctx.mouse.x,
+            ctx.mouse.y,
+            x1,
+            y1,
+            BIG_PLAYING_CARD_WIDTH,
+            BIG_PLAYING_CARD_HEIGHT,
+        );
+        let source_slot_empty: bool = ctx.cards_on_table[table_slot_index as usize].is_none();
 
         if hitbox_not_clicked || source_slot_empty {
             continue;
         }
 
         let hand_empty_slots: usize = ctx
-            .hand
             .cards_in_hand
             .iter()
             .filter(|slot| slot.is_none())
@@ -183,13 +187,8 @@ fn on_right_click_down(ctx: &mut Context) {
             return; // Hand is full, can't take table card
         }
 
-        if let Some(empty_hand_slot) = ctx
-            .hand
-            .cards_in_hand
-            .iter_mut()
-            .find(|slot| slot.is_none())
-        {
-            let card: Card = ctx.table.cards_on_table[table_slot_index as usize]
+        if let Some(empty_hand_slot) = ctx.cards_in_hand.iter_mut().find(|slot| slot.is_none()) {
+            let card: Card = ctx.cards_on_table[table_slot_index as usize]
                 .take()
                 .expect("We already checked this exists");
 
@@ -215,14 +214,13 @@ fn on_right_click_down(ctx: &mut Context) {
             BIG_PLAYING_CARD_WIDTH,
             BIG_PLAYING_CARD_HEIGHT,
         );
-        let source_slot_empty: bool = ctx.hand.cards_in_hand[hand_slot_index as usize].is_none();
+        let source_slot_empty: bool = ctx.cards_in_hand[hand_slot_index as usize].is_none();
 
         if hitbox_not_clicked || source_slot_empty {
             continue;
         }
 
         let table_empty_slots: usize = ctx
-            .table
             .cards_on_table
             .iter()
             .filter(|slot| slot.is_none())
@@ -232,13 +230,8 @@ fn on_right_click_down(ctx: &mut Context) {
             return; // Table is full, can't take hand card
         }
 
-        if let Some(empty_table_slot) = ctx
-            .table
-            .cards_on_table
-            .iter_mut()
-            .find(|slot| slot.is_none())
-        {
-            let card = ctx.hand.cards_in_hand[hand_slot_index as usize]
+        if let Some(empty_table_slot) = ctx.cards_on_table.iter_mut().find(|slot| slot.is_none()) {
+            let card = ctx.cards_in_hand[hand_slot_index as usize]
                 .take()
                 .expect("We already checked this exists");
 

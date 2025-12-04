@@ -1,13 +1,12 @@
 use crate::{
-    card::standard_52_deck,
+    card::{Card, standard_52_deck},
+    card_ops::CardDragState,
     constants::{SLOTS_MAX_COLUMN_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH},
-    dragged_card::CardDragState,
     fps_counter::FPSCounter,
-    hand::Hand,
+    poker_hand::PokerHand,
     renderer::Screen,
     shader::{build_gamma_lut, build_vignette_lut},
-    slots::{Column, Slots, build_spin_cost_lut},
-    table::Table,
+    slot_machine::{SlotMachine, SlotMachineColumn, build_spin_cost_lut},
 };
 
 pub struct Context {
@@ -15,13 +14,14 @@ pub struct Context {
     pub coins: i32,
     pub luck: i32,
     pub game_time: f32,
+    pub poker_hand: Option<PokerHand>,
+    pub cards_on_table: Vec<Option<Card>>,
+    pub cards_in_hand: Vec<Option<Card>>,
     pub settings: Settings,
     pub luts: LookUpTables,
     pub screen: Screen,
     pub mouse: MouseContext,
-    pub slots: Slots,
-    pub table: Table,
-    pub hand: Hand,
+    pub slot_machine: SlotMachine,
     pub resize_update_accumulator: f32,
     pub fps_counter: FPSCounter,
 }
@@ -32,6 +32,10 @@ impl Default for Context {
             score: 0,
             coins: 600,
             luck: 0,
+            game_time: 0.0,
+            poker_hand: None,
+            cards_on_table: vec![],
+            cards_in_hand: vec![],
             settings: Settings {
                 vignette_enabled: true,
                 bg_shader_enabled: true,
@@ -54,28 +58,19 @@ impl Default for Context {
                 is_left_down: false,
                 card_drag: CardDragState::NotDragging,
             },
-            game_time: 0.0,
-            slots: Slots {
-                state: crate::slots::SlotsState::Idle,
+            slot_machine: SlotMachine {
+                state: crate::slot_machine::SlotMachineState::Idle,
                 spin_count: 0,
                 columns: vec![
-                    Column {
+                    SlotMachineColumn {
                         cursor: 0.0,
                         cards: standard_52_deck(),
                         spin_duration: 0.0,
                         spin_time_remaining: 0.0,
                         spin_speed: 0.0,
                     };
-                    SLOTS_MAX_COLUMN_COUNT as usize
+                    3
                 ],
-            },
-            table: Table {
-                poker_hand: None,
-                cards_on_table: vec![],
-            },
-            hand: Hand {
-                hand_size: 7,
-                cards_in_hand: vec![],
             },
             resize_update_accumulator: 0.0,
             fps_counter: FPSCounter::new(0.08),

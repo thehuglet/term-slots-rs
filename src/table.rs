@@ -1,29 +1,24 @@
 use crate::{
     card::{Card, draw_calls_playing_card_big},
+    card_ops::{CardDragAndDropLocation, CardDragState},
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, TABLE_CARD_X_SPACING,
         TABLE_SLOT_COUNT,
     },
     context::Context,
-    dragged_card::{CardDragState, DragAndDropLocation},
     poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
     utils::iter_some,
 };
 
-pub struct Table {
-    pub poker_hand: Option<PokerHand>,
-    pub cards_on_table: Vec<Option<Card>>,
-}
-
 pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
-    for (index, card) in iter_some(&ctx.table.cards_on_table) {
+    for (index, card) in iter_some(&ctx.cards_on_table) {
         let n: u16 = index as u16;
         let card_x: u16 = x + n * TABLE_CARD_X_SPACING;
         let card_y: u16 = y;
         let is_being_dragged = matches!(ctx.mouse.card_drag,
             CardDragState::Dragging {
-                source: DragAndDropLocation::Table { index: src_index },
+                source: CardDragAndDropLocation::Table { index: src_index },
                 ..
             } if src_index == index
         );

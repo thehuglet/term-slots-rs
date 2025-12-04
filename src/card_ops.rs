@@ -2,7 +2,7 @@ use crate::{
     card::{Card, draw_calls_playing_card_big},
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
-        HAND_ORIGIN_Y, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
+        HAND_ORIGIN_Y, SLOTS_ORIGIN_X, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
     },
     context::Context,
     poker_hand::update_current_poker_hand,
@@ -14,12 +14,12 @@ pub enum CardDragState {
     NotDragging,
     Dragging {
         card: Card,
-        source: DragAndDropLocation,
+        source: CardDragAndDropLocation,
     },
 }
 
 #[derive(Clone)]
-pub enum DragAndDropLocation {
+pub enum CardDragAndDropLocation {
     Hand { index: usize },
     Table { index: usize },
 }
@@ -27,14 +27,14 @@ pub enum DragAndDropLocation {
 /// Retrieves the location at which a card was dropped if it was dropped on one.
 pub fn get_valid_drop_destination(
     ctx: &mut Context,
-    source_location: &DragAndDropLocation,
-) -> Option<DragAndDropLocation> {
-    for table_slot_index in 0..ctx.table.cards_on_table.len() {
+    source_location: &CardDragAndDropLocation,
+) -> Option<CardDragAndDropLocation> {
+    for table_slot_index in 0..ctx.cards_on_table.len() {
         // Table checks
         let x1: u16 = TABLE_ORIGIN_X + table_slot_index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
 
-        let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Table { index } if *index == table_slot_index);
+        let destination_is_source: bool = matches!(source_location, CardDragAndDropLocation::Table { index } if *index == table_slot_index);
         // let destination_is_locked: bool = !matches!(ctx.slots.state, SlotsState::Idle);
         let destination_is_locked: bool = false;
         let hitbox_check_failed: bool = !point_in_rect(
@@ -54,17 +54,17 @@ pub fn get_valid_drop_destination(
             continue;
         }
 
-        return Some(DragAndDropLocation::Table {
+        return Some(CardDragAndDropLocation::Table {
             index: table_slot_index,
         });
     }
 
-    for hand_slot_index in 0..ctx.hand.cards_in_hand.len() {
+    for hand_slot_index in 0..ctx.cards_in_hand.len() {
         // Hand checks
         let x1: u16 = HAND_ORIGIN_X + hand_slot_index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
 
-        let destination_is_source: bool = matches!(source_location, DragAndDropLocation::Hand { index } if *index == hand_slot_index);
+        let destination_is_source: bool = matches!(source_location, CardDragAndDropLocation::Hand { index } if *index == hand_slot_index);
         let hitbox_check_failed: bool = !point_in_rect(
             ctx.mouse.x,
             ctx.mouse.y,
@@ -78,49 +78,49 @@ pub fn get_valid_drop_destination(
             continue;
         }
 
-        return Some(DragAndDropLocation::Hand {
+        return Some(CardDragAndDropLocation::Hand {
             index: hand_slot_index,
         });
     }
     None
 }
 
-pub fn place_card_at(ctx: &mut Context, card: Card, location: &DragAndDropLocation) {
+pub fn place_card_at(ctx: &mut Context, card: Card, location: &CardDragAndDropLocation) {
     match location {
-        DragAndDropLocation::Hand { index } => {
-            ctx.hand.cards_in_hand[*index] = Some(card);
+        CardDragAndDropLocation::Hand { index } => {
+            ctx.cards_in_hand[*index] = Some(card);
         }
-        DragAndDropLocation::Table { index } => {
-            ctx.table.cards_on_table[*index] = Some(card);
+        CardDragAndDropLocation::Table { index } => {
+            ctx.cards_on_table[*index] = Some(card);
         }
     }
     update_current_poker_hand(ctx);
 }
 
-pub fn delete_card_at(ctx: &mut Context, location: &DragAndDropLocation) {
+pub fn delete_card_at(ctx: &mut Context, location: &CardDragAndDropLocation) {
     match location {
-        DragAndDropLocation::Hand { index } => {
-            ctx.hand.cards_in_hand[*index] = None;
+        CardDragAndDropLocation::Hand { index } => {
+            ctx.cards_in_hand[*index] = None;
         }
-        DragAndDropLocation::Table { index } => {
-            ctx.table.cards_on_table[*index] = None;
+        CardDragAndDropLocation::Table { index } => {
+            ctx.cards_on_table[*index] = None;
         }
     }
     update_current_poker_hand(ctx);
 }
 
-pub fn location_has_card(ctx: &mut Context, location: &DragAndDropLocation) -> bool {
+pub fn location_has_card(ctx: &mut Context, location: &CardDragAndDropLocation) -> bool {
     match location {
-        DragAndDropLocation::Hand { index } => ctx.hand.cards_in_hand[*index].is_some(),
-        DragAndDropLocation::Table { index } => ctx.table.cards_on_table[*index].is_some(),
+        CardDragAndDropLocation::Hand { index } => ctx.cards_in_hand[*index].is_some(),
+        CardDragAndDropLocation::Table { index } => ctx.cards_on_table[*index].is_some(),
     }
 }
 
 /// Will panic if either of the provided locations don't have a corresponding card.
 pub fn swap_cards_at(
     ctx: &mut Context,
-    location_a: &DragAndDropLocation,
-    location_b: &DragAndDropLocation,
+    location_a: &CardDragAndDropLocation,
+    location_b: &CardDragAndDropLocation,
 ) {
     let card_from_location_a =
         try_take_card_from(ctx, location_a).expect("'location_a' was expected to hold a card.");
@@ -151,14 +151,14 @@ pub fn draw_dragged_card(draw_queue: &mut Vec<DrawCall>, card: &Card, ctx: &mut 
     update_current_poker_hand(ctx);
 }
 
-fn try_take_card_from(ctx: &mut Context, location: &DragAndDropLocation) -> Option<Card> {
+fn try_take_card_from(ctx: &mut Context, location: &CardDragAndDropLocation) -> Option<Card> {
     let cards: Option<Card> = match location {
-        DragAndDropLocation::Hand { index } => {
-            ctx.hand.cards_in_hand[*index].take().map(|card: Card| card)
+        CardDragAndDropLocation::Hand { index } => {
+            ctx.cards_in_hand[*index].take().map(|card: Card| card)
         }
-        DragAndDropLocation::Table { index } => ctx.table.cards_on_table[*index]
-            .take()
-            .map(|card: Card| card),
+        CardDragAndDropLocation::Table { index } => {
+            ctx.cards_on_table[*index].take().map(|card: Card| card)
+        }
     };
 
     update_current_poker_hand(ctx);

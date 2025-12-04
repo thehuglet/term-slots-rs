@@ -1,8 +1,9 @@
 mod button;
 mod card;
+mod card_ops;
+mod card_slot;
 mod constants;
 mod context;
-mod dragged_card;
 mod fps_counter;
 mod fps_limiter;
 mod hand;
@@ -10,7 +11,7 @@ mod input;
 mod poker_hand;
 mod renderer;
 mod shader;
-mod slots;
+mod slot_machine;
 mod table;
 mod utils;
 
@@ -30,13 +31,13 @@ use std::{
 use crate::{
     button::{Button, draw_button},
     card::Card,
+    card_ops::{CardDragState, draw_dragged_card},
     constants::{
         HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
         SLOTS_NEIGHBOR_ROW_COUNT, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
         TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     },
     context::Context,
-    dragged_card::{CardDragState, draw_dragged_card},
     fps_counter::draw_fps_counter,
     fps_limiter::FPSLimiter,
     hand::{draw_hand, draw_hand_card_slots},
@@ -47,8 +48,8 @@ use crate::{
         diff_buffers, draw_rect, fill_screen_background,
     },
     shader::{apply_gamma, apply_vignette, draw_bg_shader},
-    slots::{
-        SlotsState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
+    slot_machine::{
+        SlotMachineState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
         draw_slots_panel, get_column_card_index, slots_are_spinning,
         slots_center_row_indexes_matching_card, spin_cost, spin_slots_column,
     },
@@ -82,43 +83,43 @@ fn main() -> io::Result<()> {
         ..Default::default()
     };
 
-    ctx.hand.cards_in_hand = vec![None; ctx.hand.hand_size as usize];
-    ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+    ctx.cards_in_hand = vec![None; HAND_SLOT_COUNT as usize];
+    ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
 
     // // ! DEBUG !
     // // Prefilling card slots
-    // ctx.hand.cards_in_hand[0] = Some(CardInHand {
+    // ctx.cards_in_hand_in_hand[0] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Heart,
     //         rank: Rank::Num3,
     //     },
     // });
-    // ctx.hand.cards_in_hand[1] = Some(CardInHand {
+    // ctx.cards_in_hand_in_hand[1] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Spade,
     //         rank: Rank::Num4,
     //     },
     // });
-    // ctx.hand.cards_in_hand[2] = Some(CardInHand {
+    // ctx.cards_in_hand_in_hand[2] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Club,
     //         rank: Rank::Num5,
     //     },
     // });
-    // ctx.hand.cards_in_hand[3] = Some(CardInHand {
+    // ctx.cards_in_hand_in_hand[3] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Club,
     //         rank: Rank::Num6,
     //     },
     // });
-    // ctx.hand.cards_in_hand[4] = Some(CardInHand {
+    // ctx.cards_in_hand_in_hand[4] = Some(CardInHand {
     //     card: PlayingCard {
     //         suit: Suit::Club,
     //         rank: Rank::Num7,
     //     },
     // });
 
-    for column in ctx.slots.columns.iter_mut() {
+    for column in ctx.slot_machine.columns.iter_mut() {
         column.cards.shuffle(&mut rand::rng());
     }
 
@@ -157,23 +158,23 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         h: 1,
         text: format!(
             "${cost} SPIN",
-            cost = spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost)
+            cost = spin_cost(ctx.slot_machine.spin_count, &ctx.luts.spin_cost)
         ),
         color: Rgba::from_u8(255, 210, 140, 1.0),
         on_click: Box::new(move |ctx| {
-            for (column_index, column) in ctx.slots.columns.iter_mut().enumerate() {
+            for (column_index, column) in ctx.slot_machine.columns.iter_mut().enumerate() {
                 let spin_duration: f32 = calc_column_spin_duration_sec(column_index);
                 column.spin_duration = spin_duration;
                 column.spin_time_remaining = spin_duration;
             }
 
-            ctx.slots.state = SlotsState::Spinning;
-            ctx.coins -= spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost);
-            ctx.slots.spin_count += 1;
+            ctx.slot_machine.state = SlotMachineState::Spinning;
+            ctx.coins -= spin_cost(ctx.slot_machine.spin_count, &ctx.luts.spin_cost);
+            ctx.slot_machine.spin_count += 1;
         }),
         enabled_when: |ctx| {
-            let spin_cost: i32 = spin_cost(ctx.slots.spin_count, &ctx.luts.spin_cost);
-            matches!(ctx.slots.state, SlotsState::Idle) && ctx.coins >= spin_cost
+            let spin_cost: i32 = spin_cost(ctx.slot_machine.spin_count, &ctx.luts.spin_cost);
+            matches!(ctx.slot_machine.state, SlotMachineState::Idle) && ctx.coins >= spin_cost
         },
     });
 
@@ -186,7 +187,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         text: "PLAY".to_string(),
         color: Rgba::from_u8(160, 210, 140, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
-            let table_cards: Vec<&Card> = ctx.table.cards_on_table.iter().flatten().collect();
+            let table_cards: Vec<&Card> = ctx.cards_on_table.iter().flatten().collect();
 
             let (poker_hand, scoring_cards): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
 
@@ -201,12 +202,11 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             ctx.score += coins_reward_total as i32;
 
             // Clear hand
-            ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
             update_current_poker_hand(ctx);
         }),
         enabled_when: |ctx| {
             let cards_on_table_count = ctx
-                .table
                 .cards_on_table
                 .iter()
                 .filter(|opt| opt.is_some())
@@ -225,12 +225,11 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         text: "BURN".to_string(),
         color: Rgba::from_u8(255, 120, 80, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
-            ctx.table.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
             update_current_poker_hand(ctx);
         }),
         enabled_when: |ctx| {
             let cards_on_table_count = ctx
-                .table
                 .cards_on_table
                 .iter()
                 .filter(|opt| opt.is_some())
@@ -241,15 +240,9 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     });
 
     // Slots post-spin reward buttons
-    let cards_in_hand_count: usize = ctx
-        .hand
-        .cards_in_hand
-        .iter()
-        .filter(|opt| opt.is_some())
-        .count();
+    let cards_in_hand_count: usize = ctx.cards_in_hand.iter().filter(|opt| opt.is_some()).count();
 
     let cards_on_table_count: usize = ctx
-        .table
         .cards_on_table
         .iter()
         .filter(|opt| opt.is_some())
@@ -258,11 +251,11 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     let at_least_one_empty_slot_in_hand: bool = cards_in_hand_count < HAND_SLOT_COUNT.into();
     let no_cards_on_table: bool = cards_on_table_count == 0;
 
-    if matches!(ctx.slots.state, SlotsState::PostSpin)
+    if matches!(ctx.slot_machine.state, SlotMachineState::PostSpin)
         && at_least_one_empty_slot_in_hand
         && no_cards_on_table
     {
-        for column_index in 0..ctx.slots.columns.len() {
+        for column_index in 0..ctx.slot_machine.columns.len() {
             let index: usize = column_index;
             buttons.push(Button {
                 x: SLOTS_ORIGIN_X + column_index as u16 * SLOTS_COLUMNS_X_SPACING,
@@ -272,10 +265,10 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                 text: "".to_string(),
                 color: Rgba::from_u8(0, 0, 0, 0.0),
                 on_click: Box::new(move |ctx: &mut Context| {
-                    ctx.slots.state = SlotsState::Idle;
+                    ctx.slot_machine.state = SlotMachineState::Idle;
 
                     let initial_card = {
-                        let column = &ctx.slots.columns[index];
+                        let column = &ctx.slot_machine.columns[index];
                         let card_index = get_column_card_index(0, column);
                         column.cards[card_index]
                     };
@@ -284,18 +277,15 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                         slots_center_row_indexes_matching_card(&initial_card, ctx)
                             .into_iter()
                             .map(|col_idx| {
-                                let column = &ctx.slots.columns[col_idx];
+                                let column = &ctx.slot_machine.columns[col_idx];
                                 let card_idx = get_column_card_index(0, column);
                                 column.cards[card_idx]
                             })
                             .collect();
 
                     for card in matching_cards {
-                        if let Some(empty_slot) = ctx
-                            .hand
-                            .cards_in_hand
-                            .iter_mut()
-                            .find(|slot| slot.is_none())
+                        if let Some(empty_slot) =
+                            ctx.cards_in_hand.iter_mut().find(|slot| slot.is_none())
                         {
                             *empty_slot = Some(card);
                         } else {
@@ -317,14 +307,14 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     // --- Game logic ---
-    if matches!(ctx.slots.state, SlotsState::Spinning) {
-        for column in &mut ctx.slots.columns {
+    if matches!(ctx.slot_machine.state, SlotMachineState::Spinning) {
+        for column in &mut ctx.slot_machine.columns {
             const MAX_SPIN_SPEED: f32 = 60.0;
             spin_slots_column(column, dt, MAX_SPIN_SPEED);
         }
 
-        if slots_are_spinning(&ctx.slots) {
-            ctx.slots.state = SlotsState::PostSpin;
+        if slots_are_spinning(&ctx.slot_machine) {
+            ctx.slot_machine.state = SlotMachineState::PostSpin;
         }
     }
 
@@ -363,7 +353,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         &mut draw_queue,
         SLOTS_ORIGIN_X,
         SLOTS_ORIGIN_Y,
-        &ctx.slots,
+        &ctx.slot_machine,
         ctx,
     );
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
@@ -411,7 +401,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     // });
 
     // Poker hand preview
-    if let Some(poker_hand) = ctx.table.poker_hand {
+    if let Some(poker_hand) = ctx.poker_hand {
         let text_centered: String = if matches!(poker_hand, PokerHand::HighCard) {
             center_text_unicode(poker_hand.repr().to_string(), SIDEBAR_BORDER_X as usize)
         } else {

@@ -108,15 +108,15 @@ fn rank_straight_value(rank: Rank) -> i32 {
 
 /// A helper wrapper that makes updating the current poker hand easier
 pub fn update_current_poker_hand(ctx: &mut Context) {
-    let table_cards: Vec<&Card> = ctx.table.cards_on_table.iter().flatten().collect();
+    let table_cards: Vec<&Card> = ctx.cards_on_table.iter().flatten().collect();
 
     if table_cards.is_empty() {
-        ctx.table.poker_hand = None;
+        ctx.poker_hand = None;
         return;
     }
 
     let (poker_hand, _): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
-    ctx.table.poker_hand = Some(poker_hand);
+    ctx.poker_hand = Some(poker_hand);
 }
 
 pub fn eval_poker_hand(cards_: &[&Card]) -> (PokerHand, Vec<Card>) {

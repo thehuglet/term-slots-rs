@@ -1,25 +1,25 @@
 use crate::{
     card::{Card, draw_calls_playing_card_small},
+    card_ops::CardDragState,
     constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
     context::Context,
-    dragged_card::CardDragState,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
 };
 
-pub enum SlotsState {
+pub enum SlotMachineState {
     Idle,
     Spinning,
     PostSpin,
 }
 
-pub struct Slots {
-    pub state: SlotsState,
+pub struct SlotMachine {
+    pub state: SlotMachineState,
     pub spin_count: i32,
-    pub columns: Vec<Column>,
+    pub columns: Vec<SlotMachineColumn>,
 }
 
 #[derive(Clone)]
-pub struct Column {
+pub struct SlotMachineColumn {
     pub cursor: f32,
     pub cards: Vec<Card>,
     pub spin_duration: f32,
@@ -92,7 +92,7 @@ pub fn calc_column_spin_duration_sec(col_index: usize) -> f32 {
     BASE_SPIN_DURATION_SEC + total_stagger
 }
 
-pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
+pub fn spin_slots_column(column: &mut SlotMachineColumn, dt: f32, max_spin_speed: f32) {
     const SNAP_THRESHOLD: f32 = 0.15;
 
     column.spin_time_remaining = (column.spin_time_remaining - dt).max(0.0);
@@ -122,11 +122,11 @@ pub fn spin_slots_column(column: &mut Column, dt: f32, max_spin_speed: f32) {
     }
 }
 
-pub fn slots_are_spinning(slots: &Slots) -> bool {
+pub fn slots_are_spinning(slots: &SlotMachine) -> bool {
     slots.columns.iter().all(|column| column.spin_speed == 0.0)
 }
 
-pub fn get_column_card_index(row_offset: i16, column: &Column) -> usize {
+pub fn get_column_card_index(row_offset: i16, column: &SlotMachineColumn) -> usize {
     let cards_len: i16 = column.cards.len() as i16;
     let index: i16 = column.cursor as i16 + row_offset;
     let wrapped_index: i16 = index.rem_euclid(cards_len);
@@ -186,35 +186,41 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
     );
 }
 
-pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, slots: &Slots, ctx: &Context) {
-    let maybe_hovered_card: Option<(usize, &Card)> =
-        ctx.slots
-            .columns
-            .iter()
-            .enumerate()
-            .find_map(|(column_index, column)| {
-                let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
-                let column_y: u16 = y;
+pub fn draw_slots(
+    draw_queue: &mut Vec<DrawCall>,
+    x: u16,
+    y: u16,
+    slots: &SlotMachine,
+    ctx: &Context,
+) {
+    let maybe_hovered_card: Option<(usize, &Card)> = ctx
+        .slot_machine
+        .columns
+        .iter()
+        .enumerate()
+        .find_map(|(column_index, column)| {
+            let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
+            let column_y: u16 = y;
 
-                let is_hovering: bool = point_in_rect(
-                    ctx.mouse.x,
-                    ctx.mouse.y,
-                    column_x,
-                    column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-                    SLOTS_COLUMNS_X_SPACING,
-                    1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2, // center + top neighbors + bottom_neighbors
-                );
+            let is_hovering: bool = point_in_rect(
+                ctx.mouse.x,
+                ctx.mouse.y,
+                column_x,
+                column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
+                SLOTS_COLUMNS_X_SPACING,
+                1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2, // center + top neighbors + bottom_neighbors
+            );
 
-                if is_hovering {
-                    let card_index = get_column_card_index(0, column);
-                    column
-                        .cards
-                        .get(card_index)
-                        .map(|card| (column_index, card))
-                } else {
-                    None
-                }
-            });
+            if is_hovering {
+                let card_index = get_column_card_index(0, column);
+                column
+                    .cards
+                    .get(card_index)
+                    .map(|card| (column_index, card))
+            } else {
+                None
+            }
+        });
 
     for (column_index, column) in slots.columns.iter().enumerate() {
         let n: u16 = column_index as u16;
@@ -251,7 +257,7 @@ fn draw_column(
     draw_queue: &mut Vec<DrawCall>,
     x: u16,
     y: u16,
-    column: &Column,
+    column: &SlotMachineColumn,
     ctx: &Context,
     is_hovered: bool,
     is_matching_hovered: bool,
@@ -274,7 +280,7 @@ fn draw_column(
         let mut card_draw_calls: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
 
         if row_offset == 0 {
-            if matches!(ctx.slots.state, SlotsState::PostSpin) {
+            if matches!(ctx.slot_machine.state, SlotMachineState::PostSpin) {
                 let interact_with_me_color = Rgba::from_f32(1.0, 1.0, 0.3, 1.0);
                 let highlight_color = Rgba::from_f32(0.0, 1.0, 0.0, 1.0);
 
@@ -335,12 +341,19 @@ pub fn draw_slots_column_shadows(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16)
         let y: i16 = (y - 3) as i16;
         let shadow_color: Rgba = Rgba::from_u8(0, 0, 0, 0.1);
 
-        draw_rect(draw_queue, x + 2, y, 1, 6, shadow_color)
+        draw_rect(
+            draw_queue,
+            x + 2,
+            y,
+            1,
+            1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2,
+            shadow_color,
+        )
     }
 }
 
 pub fn slots_center_row_indexes_matching_card(target_card: &Card, ctx: &Context) -> Vec<usize> {
-    ctx.slots
+    ctx.slot_machine
         .columns
         .iter()
         .enumerate()
