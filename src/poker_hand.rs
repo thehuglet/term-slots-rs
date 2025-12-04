@@ -2,6 +2,7 @@ use std::cmp::Reverse;
 
 use crate::{
     card::{Card, Rank, Suit},
+    card_slot::CardSlot,
     context::Context,
 };
 
@@ -106,16 +107,20 @@ fn rank_straight_value(rank: Rank) -> i32 {
     }
 }
 
-/// A helper wrapper that makes updating the current poker hand easier
+// This function signature is the black box kind of awful, TODO: fix this
 pub fn update_current_poker_hand(ctx: &mut Context) {
-    let table_cards: Vec<&Card> = ctx.cards_on_table.iter().flatten().collect();
+    let cards: Vec<&Card> = ctx
+        .table_card_slots
+        .iter()
+        .filter_map(|slot| slot.card.as_ref())
+        .collect();
 
-    if table_cards.is_empty() {
+    if cards.is_empty() {
         ctx.poker_hand = None;
         return;
     }
 
-    let (poker_hand, _): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
+    let (poker_hand, _): (PokerHand, Vec<Card>) = eval_poker_hand(&cards);
     ctx.poker_hand = Some(poker_hand);
 }
 

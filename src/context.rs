@@ -1,7 +1,12 @@
 use crate::{
     card::{Card, standard_52_deck},
     card_ops::CardDragState,
-    constants::{SLOTS_MAX_COLUMN_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH},
+    card_slot::{CardSlot, build_card_slots},
+    constants::{
+        HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SLOTS_MAX_COLUMN_COUNT,
+        TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT,
+        TERM_SCREEN_WIDTH,
+    },
     fps_counter::FPSCounter,
     poker_hand::PokerHand,
     renderer::Screen,
@@ -15,13 +20,13 @@ pub struct Context {
     pub luck: i32,
     pub game_time: f32,
     pub poker_hand: Option<PokerHand>,
-    pub cards_on_table: Vec<Option<Card>>,
-    pub cards_in_hand: Vec<Option<Card>>,
-    pub settings: Settings,
-    pub luts: LookUpTables,
-    pub screen: Screen,
-    pub mouse: MouseContext,
+    pub table_card_slots: Vec<CardSlot>,
+    pub hand_card_slots: Vec<CardSlot>,
     pub slot_machine: SlotMachine,
+    pub luts: LookUpTables,
+    pub settings: Settings,
+    pub mouse: MouseContext,
+    pub screen: Screen,
     pub resize_update_accumulator: f32,
     pub fps_counter: FPSCounter,
 }
@@ -34,8 +39,18 @@ impl Default for Context {
             luck: 0,
             game_time: 0.0,
             poker_hand: None,
-            cards_on_table: vec![],
-            cards_in_hand: vec![],
+            table_card_slots: build_card_slots(
+                TABLE_ORIGIN_X,
+                TABLE_ORIGIN_Y,
+                TABLE_CARD_X_SPACING,
+                TABLE_SLOT_COUNT.into(),
+            ),
+            hand_card_slots: build_card_slots(
+                HAND_ORIGIN_X,
+                HAND_ORIGIN_Y,
+                HAND_CARD_X_SPACING,
+                HAND_SLOT_COUNT.into(),
+            ),
             settings: Settings {
                 vignette_enabled: true,
                 bg_shader_enabled: true,
@@ -69,7 +84,7 @@ impl Default for Context {
                         spin_time_remaining: 0.0,
                         spin_speed: 0.0,
                     };
-                    3
+                    6
                 ],
             },
             resize_update_accumulator: 0.0,

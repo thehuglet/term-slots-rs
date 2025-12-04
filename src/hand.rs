@@ -11,24 +11,30 @@ use crate::{
 };
 
 pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
-    for (index, card) in iter_some(&ctx.cards_in_hand) {
-        let n: u16 = index as u16;
-        let card_x: u16 = x + n * HAND_CARD_X_SPACING;
-        let card_y: u16 = y;
-        let is_being_dragged = matches!(ctx.mouse.card_drag,
+    let slots_with_cards = ctx
+        .hand_card_slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| match &slot.card {
+            Some(card) => Some((index, slot, card)),
+            None => None,
+        });
+
+    for (index, slot, card) in slots_with_cards {
+        let card_is_being_dragged = matches!(ctx.mouse.card_drag,
             CardDragState::Dragging {
                 source: CardDragAndDropLocation::Hand { index: src_index },
                 ..
             } if src_index == index
         );
 
-        if is_being_dragged {
-            // Don't draw the card at it's original pos while it's being dragged
+        if card_is_being_dragged {
+            // Skip drawing the card at the slot
+            // while it's being dragged
             continue;
         }
 
-        let mut draw_calls: Vec<DrawCall> =
-            draw_calls_playing_card_big(card_x as i16, card_y as i16, card);
+        let mut draw_calls = draw_calls_playing_card_big(slot.x as i16, slot.y as i16 as i16, card);
 
         for dc in &mut draw_calls {
             let mut fg_hsl: Hsl = dc.rich_text.fg.into();

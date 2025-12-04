@@ -7,7 +7,7 @@ use crate::{
     card::Card,
     card_ops::{
         CardDragAndDropLocation, CardDragState, delete_card_at, get_valid_drop_destination,
-        location_has_card, place_card_at, swap_cards_at,
+        location_has_card, place_card_at, swap_cards,
     },
     constants::{
         BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
@@ -84,7 +84,16 @@ fn on_left_click_down(ctx: &mut Context) {
 
     // Drag detection
     // > Table
-    for (index, card) in iter_some(&ctx.cards_on_table) {
+    let table_slots_with_cards =
+        ctx.table_card_slots
+            .iter()
+            .enumerate()
+            .filter_map(|(index, slot)| match &slot.card {
+                Some(card) => Some((index, slot, card)),
+                None => None,
+            });
+
+    for (index, slot, card) in table_slots_with_cards {
         let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
 
@@ -102,8 +111,19 @@ fn on_left_click_down(ctx: &mut Context) {
             };
         }
     }
+
     // > Hand
-    for (index, card) in iter_some(&ctx.cards_in_hand) {
+    let hand_slots_with_cards =
+        ctx.hand_card_slots
+            .iter()
+            .enumerate()
+            .filter_map(|(index, slot)| match &slot.card {
+                Some(card) => Some((index, slot, card)),
+
+                None => None,
+            });
+
+    for (index, slot, card) in hand_slots_with_cards {
         let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
 
@@ -149,7 +169,7 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
         && let Some(destination) = get_valid_drop_destination(ctx, &source)
     {
         if location_has_card(ctx, &destination) {
-            swap_cards_at(ctx, &source, &destination);
+            swap_cards(ctx, &source, &destination);
         } else {
             place_card_at(ctx, card, &destination);
             delete_card_at(ctx, &source);
@@ -171,28 +191,35 @@ fn on_right_click_down(ctx: &mut Context) {
             BIG_PLAYING_CARD_WIDTH,
             BIG_PLAYING_CARD_HEIGHT,
         );
-        let source_slot_empty: bool = ctx.cards_on_table[table_slot_index as usize].is_none();
+        let source_slot_empty: bool = ctx.table_card_slots[table_slot_index as usize]
+            .card
+            .is_none();
 
         if hitbox_not_clicked || source_slot_empty {
             continue;
         }
 
         let hand_empty_slots: usize = ctx
-            .cards_in_hand
+            .hand_card_slots
             .iter()
-            .filter(|slot| slot.is_none())
+            .filter(|slot| slot.card.is_none())
             .count();
 
         if hand_empty_slots == 0 {
             return; // Hand is full, can't take table card
         }
 
-        if let Some(empty_hand_slot) = ctx.cards_in_hand.iter_mut().find(|slot| slot.is_none()) {
-            let card: Card = ctx.cards_on_table[table_slot_index as usize]
+        if let Some(empty_hand_slot) = ctx
+            .hand_card_slots
+            .iter_mut()
+            .find(|slot| slot.card.is_none())
+        {
+            let card: Card = ctx.table_card_slots[table_slot_index as usize]
+                .card
                 .take()
                 .expect("We already checked this exists");
 
-            *empty_hand_slot = Some(card);
+            empty_hand_slot.card = Some(card);
 
             update_current_poker_hand(ctx);
 
@@ -214,28 +241,33 @@ fn on_right_click_down(ctx: &mut Context) {
             BIG_PLAYING_CARD_WIDTH,
             BIG_PLAYING_CARD_HEIGHT,
         );
-        let source_slot_empty: bool = ctx.cards_in_hand[hand_slot_index as usize].is_none();
+        let source_slot_empty: bool = ctx.hand_card_slots[hand_slot_index as usize].card.is_none();
 
         if hitbox_not_clicked || source_slot_empty {
             continue;
         }
 
         let table_empty_slots: usize = ctx
-            .cards_on_table
+            .table_card_slots
             .iter()
-            .filter(|slot| slot.is_none())
+            .filter(|slot| slot.card.is_none())
             .count();
 
         if table_empty_slots == 0 {
             return; // Table is full, can't take hand card
         }
 
-        if let Some(empty_table_slot) = ctx.cards_on_table.iter_mut().find(|slot| slot.is_none()) {
-            let card = ctx.cards_in_hand[hand_slot_index as usize]
+        if let Some(empty_table_slot) = ctx
+            .table_card_slots
+            .iter_mut()
+            .find(|slot| slot.card.is_none())
+        {
+            let card = ctx.hand_card_slots[hand_slot_index as usize]
+                .card
                 .take()
                 .expect("We already checked this exists");
 
-            *empty_table_slot = Some(card);
+            empty_table_slot.card = Some(card);
 
             update_current_poker_hand(ctx);
 

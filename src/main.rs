@@ -83,9 +83,6 @@ fn main() -> io::Result<()> {
         ..Default::default()
     };
 
-    ctx.cards_in_hand = vec![None; HAND_SLOT_COUNT as usize];
-    ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
-
     // // ! DEBUG !
     // // Prefilling card slots
     // ctx.cards_in_hand_in_hand[0] = Some(CardInHand {
@@ -187,9 +184,13 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         text: "PLAY".to_string(),
         color: Rgba::from_u8(160, 210, 140, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
-            let table_cards: Vec<&Card> = ctx.cards_on_table.iter().flatten().collect();
+            let cards: Vec<&Card> = ctx
+                .table_card_slots
+                .iter()
+                .filter_map(|slot| slot.card.as_ref())
+                .collect();
 
-            let (poker_hand, scoring_cards): (PokerHand, Vec<Card>) = eval_poker_hand(&table_cards);
+            let (poker_hand, scoring_cards): (PokerHand, Vec<Card>) = eval_poker_hand(&cards);
 
             let mut coins_reward_total: u16 = poker_hand.coin_value() as u16;
 
@@ -202,17 +203,15 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             ctx.score += coins_reward_total as i32;
 
             // Clear hand
-            ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            ctx.table_card_slots.iter_mut().for_each(|slot| {
+                slot.card = None;
+            });
             update_current_poker_hand(ctx);
         }),
         enabled_when: |ctx| {
-            let cards_on_table_count = ctx
-                .cards_on_table
-                .iter()
-                .filter(|opt| opt.is_some())
-                .count();
-
-            cards_on_table_count > 0
+            let any_cards_on_table: bool =
+                ctx.table_card_slots.iter().any(|slot| slot.card.is_some());
+            any_cards_on_table
         },
     });
 
@@ -225,27 +224,29 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         text: "BURN".to_string(),
         color: Rgba::from_u8(255, 120, 80, 1.0),
         on_click: Box::new(move |ctx: &mut Context| {
-            ctx.cards_on_table = vec![None; TABLE_SLOT_COUNT as usize];
+            ctx.table_card_slots.iter_mut().for_each(|slot| {
+                slot.card = None;
+            });
             update_current_poker_hand(ctx);
         }),
         enabled_when: |ctx| {
-            let cards_on_table_count = ctx
-                .cards_on_table
-                .iter()
-                .filter(|opt| opt.is_some())
-                .count();
-
-            cards_on_table_count > 0
+            let any_cards_on_table: bool =
+                ctx.table_card_slots.iter().any(|slot| slot.card.is_some());
+            any_cards_on_table
         },
     });
 
     // Slots post-spin reward buttons
-    let cards_in_hand_count: usize = ctx.cards_in_hand.iter().filter(|opt| opt.is_some()).count();
+    let cards_in_hand_count: usize = ctx
+        .hand_card_slots
+        .iter()
+        .filter(|slot| slot.card.is_some())
+        .count();
 
     let cards_on_table_count: usize = ctx
-        .cards_on_table
+        .table_card_slots
         .iter()
-        .filter(|opt| opt.is_some())
+        .filter(|slot| slot.card.is_some())
         .count();
 
     let at_least_one_empty_slot_in_hand: bool = cards_in_hand_count < HAND_SLOT_COUNT.into();
@@ -284,10 +285,12 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
                             .collect();
 
                     for card in matching_cards {
-                        if let Some(empty_slot) =
-                            ctx.cards_in_hand.iter_mut().find(|slot| slot.is_none())
+                        if let Some(empty_slot) = ctx
+                            .hand_card_slots
+                            .iter_mut()
+                            .find(|slot| slot.card.is_none())
                         {
-                            *empty_slot = Some(card);
+                            empty_slot.card = Some(card);
                         } else {
                             // No more empty slots
                             break;
