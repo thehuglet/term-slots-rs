@@ -86,13 +86,13 @@ fn main() -> io::Result<()> {
 
     // ! DEBUG !
     // Prefilling card slots
-    for index in 0..7 {
-        ctx.hand_card_slots[index].card = Some(Card {
-            suit: Suit::Heart,
-            rank: Rank::Num3,
-        });
-    }
-    ctx.slot_machine.state = SlotMachineState::PostSpin;
+    // for index in 0..7 {
+    //     ctx.hand_card_slots[index].card = Some(Card {
+    //         suit: Suit::Heart,
+    //         rank: Rank::Num3,
+    //     });
+    // }
+    // ctx.slot_machine.state = SlotMachineState::PostSpin;
 
     for column in ctx.slot_machine.columns.iter_mut() {
         column.cards.shuffle(&mut rand::rng());

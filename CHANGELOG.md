@@ -5,8 +5,8 @@
 
 ## v0.3.0
 
-- Changed spin cost scaling formula to follow a linear curve instead of an exponential one
-- Cards can now be picked from slots when cards are present on the table
-- Added right click support to slots card picking
-- Hovered and matching slots cards will now be highlighted in red when hand has no space in it
-- Attempting to pick a slots card will now trigger a red flash warning on cards in hand if there is no space for it
+- Changed spin cost scaling formula to follow a linear curve instead of an exponential one ([0ccaca0](https://github.com/thehuglet/term-slots-rs/commit/0ccaca030f8115cae02f7d5e14ea2338d0225df7))
+- Cards can now be picked from slots when cards are present on the table ([0ccaca0](https://github.com/thehuglet/term-slots-rs/commit/0ccaca030f8115cae02f7d5e14ea2338d0225df7))
+- Added right click support to slots card picking ([0ccaca0](https://github.com/thehuglet/term-slots-rs/commit/0ccaca030f8115cae02f7d5e14ea2338d0225df7))
+- Hovered and matching slots cards will now be highlighted in red when hand has no space in it ([0ccaca0](https://github.com/thehuglet/term-slots-rs/commit/0ccaca030f8115cae02f7d5e14ea2338d0225df7))
+- Attempting to pick a slots card will now trigger a red flash warning on cards in hand if there is no space for it ([0ccaca0](https://github.com/thehuglet/term-slots-rs/commit/0ccaca030f8115cae02f7d5e14ea2338d0225df7))
