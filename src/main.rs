@@ -45,7 +45,7 @@ use crate::{
     poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
     renderer::{
         Cell, DrawCall, Hsl, Rgba, RichText, build_crossterm_content_style, compose_buffer,
-        diff_buffers, draw_rect, fill_screen_background,
+        diff_buffers, draw_rect, draw_text, fill_screen_background,
     },
     shader::{apply_gamma, apply_vignette, draw_bg_shader},
     slot_machine::{
@@ -339,7 +339,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
         // Above slots strip
         draw_bg_shader(&mut draw_queue, 0, 0, SIDEBAR_BORDER_X, 1, ctx.game_time);
 
-        // The rest
+        // Main play area
         let y: u16 = 10;
         draw_bg_shader(
             &mut draw_queue,
@@ -352,13 +352,7 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     }
 
     draw_slots_panel(&mut draw_queue, 0, 1, 37, 7);
-    draw_slots(
-        &mut draw_queue,
-        SLOTS_ORIGIN_X,
-        SLOTS_ORIGIN_Y,
-        &ctx.slot_machine,
-        ctx,
-    );
+    draw_slots(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, ctx);
     draw_slots_column_shadows(&mut draw_queue, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y);
 
     draw_table_card_slots(&mut draw_queue, TABLE_ORIGIN_X, TABLE_ORIGIN_Y);
@@ -370,13 +364,14 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     draw_sidebar_border(&mut draw_queue, SIDEBAR_BORDER_X);
 
     // Score drawing
-    draw_queue.push(DrawCall {
-        x: SIDEBAR_BORDER_X + 3,
-        y: 3,
-        rich_text: RichText::new(format!("{:>12}", ctx.score))
+    draw_text(
+        &mut draw_queue,
+        SIDEBAR_BORDER_X + 3,
+        3,
+        RichText::new(format!("{:>12}", ctx.score))
             .with_fg(Rgba::from_u8(190, 230, 255, 1.0))
             .with_bold(true),
-    });
+    );
 
     // Used for aligning the currency symbols of all currency displays
     let coin_display_width: u16 = format!("{}", ctx.coins).chars().count() as u16;
@@ -384,24 +379,29 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
     let currency_width: u16 = cmp::max(coin_display_width, luck_display_width);
 
     // Coin currency drawing
-    let coin_formatted = format!("$ {:>width$}", ctx.coins, width = currency_width as usize);
-    draw_queue.push(DrawCall {
-        x: SIDEBAR_BORDER_X + 3,
-        y: 5,
-        rich_text: RichText::new(format!("{coin_formatted:>12}"))
-            .with_fg(Rgba::from_u8(255, 255, 155, 1.0))
-            .with_bold(true),
-    });
+    let coin_formatted: String =
+        format!("$ {:>width$}", ctx.coins, width = currency_width as usize);
+    let coin_amount_rich_text = RichText::new(format!("{coin_formatted:>12}"))
+        .with_fg(Rgba::from_u8(255, 255, 155, 1.0))
+        .with_bold(true);
+    draw_text(
+        &mut draw_queue,
+        SIDEBAR_BORDER_X + 3,
+        5,
+        coin_amount_rich_text,
+    );
 
     // Luck currency drawing
-    // let luck_formatted = format!("# {:>width$}", ctx.luck, width = currency_width as usize);
-    // draw_queue.push(DrawCall {
-    //     x: SIDEBAR_BORDER_X + 3,
-    //     y: 6,
-    //     rich_text: RichText::new(format!("{:>12}", luck_formatted))
-    //         .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
-    //         .with_bold(true),
-    // });
+    let luck_formatted: String = format!("# {:>width$}", ctx.luck, width = currency_width as usize);
+    let luck_amount_rich_text = RichText::new(format!("{:>12}", luck_formatted))
+        .with_fg(Rgba::from_u8(150, 255, 150, 1.0))
+        .with_bold(true);
+    draw_text(
+        &mut draw_queue,
+        SIDEBAR_BORDER_X + 3,
+        6,
+        luck_amount_rich_text,
+    );
 
     // Poker hand preview
     if let Some(poker_hand) = ctx.poker_hand {
@@ -418,11 +418,12 @@ fn tick(ctx: &mut Context, dt: f32, stdout: &mut Stdout) -> io::Result<ProgramSt
             )
         };
 
-        draw_queue.push(DrawCall {
-            x: 0,
-            y: 18,
-            rich_text: RichText::new(text_centered).with_bold(true),
-        });
+        draw_text(
+            &mut draw_queue,
+            0,
+            18,
+            RichText::new(text_centered).with_bold(true),
+        );
     }
 
     for button in &mut buttons {

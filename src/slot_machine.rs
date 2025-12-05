@@ -186,13 +186,7 @@ pub fn draw_slots_panel(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, w: u16, 
     );
 }
 
-pub fn draw_slots(
-    draw_queue: &mut Vec<DrawCall>,
-    x: u16,
-    y: u16,
-    slots: &SlotMachine,
-    ctx: &Context,
-) {
+pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
     let maybe_hovered_card: Option<(usize, &Card)> = ctx
         .slot_machine
         .columns
@@ -222,7 +216,7 @@ pub fn draw_slots(
             }
         });
 
-    for (column_index, column) in slots.columns.iter().enumerate() {
+    for (column_index, column) in ctx.slot_machine.columns.iter().enumerate() {
         let n: u16 = column_index as u16;
         let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
         let column_y: u16 = y;

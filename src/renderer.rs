@@ -308,8 +308,10 @@ pub fn fill_screen_background(buf: &mut ScreenBuffer, bg: (u8, u8, u8)) {
     }
 }
 
-/// Takes `i16` instead of `u16` for `x` and `y` to allow for
-/// correct clipping when the drawn element is partially off screen.
+pub fn draw_text(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, rich_text: RichText) {
+    draw_queue.push(DrawCall { x, y, rich_text });
+}
+
 pub fn draw_rect(draw_queue: &mut Vec<DrawCall>, x: i16, y: i16, w: u16, h: u16, color: Rgba) {
     for row_index in 0..h as i16 {
         let line_x: i16 = x.max(0);
