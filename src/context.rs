@@ -1,3 +1,5 @@
+use std::collections::{HashMap, hash_map};
+
 use crate::{
     card::{Card, standard_52_deck},
     card_ops::CardDragState,
@@ -11,7 +13,7 @@ use crate::{
     poker_hand::PokerHand,
     renderer::Screen,
     shader::{build_gamma_lut, build_vignette_lut},
-    slot_machine::{SlotMachine, SlotMachineColumn, build_spin_cost_lut},
+    slot_machine::{SlotMachine, SlotMachineColumn},
 };
 
 pub struct Context {
@@ -19,6 +21,7 @@ pub struct Context {
     pub coins: i32,
     pub luck: i32,
     pub game_time: f32,
+
     pub poker_hand: Option<PokerHand>,
     pub table_card_slots: Vec<CardSlot>,
     pub hand_card_slots: Vec<CardSlot>,
@@ -28,6 +31,7 @@ pub struct Context {
     pub mouse: MouseContext,
     pub screen: Screen,
     pub resize_update_accumulator: f32,
+    pub impulse_timestamps: HashMap<ImpulseId, f32>,
     pub fps_counter: FPSCounter,
 }
 
@@ -38,6 +42,7 @@ impl Default for Context {
             coins: 600,
             luck: 0,
             game_time: 0.0,
+            impulse_timestamps: HashMap::new(),
             poker_hand: None,
             table_card_slots: build_card_slots(
                 TABLE_ORIGIN_X,
@@ -56,7 +61,6 @@ impl Default for Context {
                 bg_shader_enabled: true,
             },
             luts: LookUpTables {
-                spin_cost: build_spin_cost_lut(1000),
                 gamma: build_gamma_lut(0.75),
                 vignette: build_vignette_lut(
                     TERM_SCREEN_WIDTH as usize,
@@ -106,7 +110,11 @@ pub struct Settings {
 }
 
 pub struct LookUpTables {
-    pub spin_cost: Vec<i32>,
     pub gamma: [u8; 256],
     pub vignette: Vec<f32>,
+}
+
+#[derive(Hash, Eq, PartialEq)]
+pub enum ImpulseId {
+    NoSpaceInHandHint,
 }

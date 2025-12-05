@@ -17,7 +17,6 @@ use crate::{
     context::Context,
     poker_hand::update_current_poker_hand,
     renderer::{Screen, point_in_rect},
-    utils::iter_some,
 };
 
 #[derive(PartialEq)]
@@ -52,7 +51,7 @@ pub fn resolve_input(ctx: &mut Context, event: Event, buttons: &[Button]) -> Pro
         }
         Event::Mouse(mouse_event) => match mouse_event.kind {
             MouseEventKind::Down(MouseButton::Left) => on_left_click_down(ctx),
-            MouseEventKind::Down(MouseButton::Right) => on_right_click_down(ctx),
+            MouseEventKind::Down(MouseButton::Right) => on_right_click_down(ctx, buttons),
             MouseEventKind::Up(MouseButton::Left) => on_left_click_up(ctx, buttons),
             MouseEventKind::Moved => {
                 ctx.mouse.x = mouse_event.column;
@@ -84,14 +83,11 @@ fn on_left_click_down(ctx: &mut Context) {
 
     // Drag detection
     // > Table
-    let table_slots_with_cards =
-        ctx.table_card_slots
-            .iter()
-            .enumerate()
-            .filter_map(|(index, slot)| match &slot.card {
-                Some(card) => Some((index, slot, card)),
-                None => None,
-            });
+    let table_slots_with_cards = ctx
+        .table_card_slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| slot.card.as_ref().map(|card| (index, slot, card)));
 
     for (index, slot, card) in table_slots_with_cards {
         let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
@@ -113,15 +109,11 @@ fn on_left_click_down(ctx: &mut Context) {
     }
 
     // > Hand
-    let hand_slots_with_cards =
-        ctx.hand_card_slots
-            .iter()
-            .enumerate()
-            .filter_map(|(index, slot)| match &slot.card {
-                Some(card) => Some((index, slot, card)),
-
-                None => None,
-            });
+    let hand_slots_with_cards = ctx
+        .hand_card_slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| slot.card.as_ref().map(|card| (index, slot, card)));
 
     for (index, slot, card) in hand_slots_with_cards {
         let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
@@ -177,7 +169,16 @@ fn on_left_click_up(ctx: &mut Context, buttons: &[Button]) {
     }
 }
 
-fn on_right_click_down(ctx: &mut Context) {
+fn on_right_click_down(ctx: &mut Context, buttons: &[Button]) {
+    // Fast button clicks (not enabled on all)
+    let maybe_button: Option<&Button> = get_button_at(buttons, ctx.mouse.x, ctx.mouse.y);
+    if let Some(button) = maybe_button
+        && button.allow_rmb
+        && (button.enabled_when)(ctx)
+    {
+        (button.on_click)(ctx);
+    }
+
     // Check if clicked on a table card first (Table -> Hand)
     for table_slot_index in 0..TABLE_SLOT_COUNT {
         let x1: u16 = TABLE_ORIGIN_X + table_slot_index * HAND_CARD_X_SPACING;

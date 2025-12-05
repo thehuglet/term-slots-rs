@@ -12,6 +12,13 @@ pub enum SlotMachineState {
     PostSpin,
 }
 
+enum CardStatusHighlight {
+    AttentionCatcher,
+    Hover,
+    MatchingHoveredCard,
+    WouldNotFitInHand,
+}
+
 pub struct SlotMachine {
     pub state: SlotMachineState,
     pub spin_count: i32,
@@ -27,33 +34,9 @@ pub struct SlotMachineColumn {
     pub spin_speed: f32,
 }
 
-pub fn build_spin_cost_lut(max_spins: usize) -> Vec<i32> {
-    let base: f32 = 5.0;
-    let growth: f32 = 1.3;
-    let divisor: f32 = 3.0;
-
-    let mut lut: Vec<i32> = Vec::with_capacity(max_spins);
-
-    for spin in 0..max_spins {
-        let cost: f32 = if spin == 0 {
-            base
-        } else {
-            let exp: f32 = spin as f32 / divisor; // spin, not spin-1
-            base * growth.powf(exp)
-        };
-        lut.push(cost.round() as i32);
-    }
-
-    lut
-}
-
-pub fn spin_cost(spin_count: i32, lut: &[i32]) -> i32 {
-    let cost_index: usize = spin_count as usize;
-    lut.get(cost_index).copied().unwrap_or_else(|| {
-        let last: i32 = *lut.last().unwrap_or(&5);
-        let extra: usize = spin_count as usize - (lut.len() - 1);
-        (last as f32 * 1.3f32.powf(extra as f32 / 3.0)).round() as i32
-    })
+pub fn spin_cost(spin_count: i32) -> i32 {
+    let base_cost: i32 = 5;
+    base_cost + spin_count * 2
 }
 
 pub fn calc_column_spin_duration_sec(col_index: usize) -> f32 {
@@ -201,7 +184,7 @@ pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context)
                 ctx.mouse.y,
                 column_x,
                 column_y - SLOTS_NEIGHBOR_ROW_COUNT as u16,
-                SLOTS_COLUMNS_X_SPACING,
+                3,
                 1 + SLOTS_NEIGHBOR_ROW_COUNT as u16 * 2, // center + top neighbors + bottom_neighbors
             );
 
@@ -216,33 +199,87 @@ pub fn draw_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context)
             }
         });
 
+    if maybe_hovered_card.is_none() {
+        // Draw without highlighting
+        for (column_index, column) in ctx.slot_machine.columns.iter().enumerate() {
+            let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
+            draw_column(
+                draw_queue,
+                column_x,
+                y,
+                column,
+                ctx,
+                false,
+                false,
+                false,
+                Some(CardStatusHighlight::AttentionCatcher),
+            );
+        }
+        return;
+    }
+
+    let (hovered_col_idx, hovered_card) = maybe_hovered_card.unwrap();
+    let empty_hand_slot_count: u8 = ctx
+        .hand_card_slots
+        .iter()
+        .filter(|slot| slot.card.is_none())
+        .count() as u8;
+
+    let all_matching = slots_center_row_indexes_matching_card(hovered_card, ctx);
+    let other_matching: Vec<usize> = all_matching
+        .iter()
+        .filter(|&&idx| idx != hovered_col_idx)
+        .copied()
+        .collect();
+
+    let slots_for_other_matching = if empty_hand_slot_count == 0 {
+        0 // No room at all
+    } else {
+        // We can take min(empty_slots - 1, other_matching.len())
+        // But we want to know exactly how many other matching cards can fit
+        empty_hand_slot_count.saturating_sub(1) as usize
+    };
+
+    let fitting_other_matching: Vec<usize> = other_matching
+        .iter()
+        .take(slots_for_other_matching)
+        .copied()
+        .collect();
+
+    let not_fitting_other_matching: Vec<usize> = other_matching
+        .iter()
+        .skip(slots_for_other_matching)
+        .copied()
+        .collect();
+
     for (column_index, column) in ctx.slot_machine.columns.iter().enumerate() {
-        let n: u16 = column_index as u16;
-        let column_x: u16 = x + n * SLOTS_COLUMNS_X_SPACING;
-        let column_y: u16 = y;
+        let column_x: u16 = x + column_index as u16 * SLOTS_COLUMNS_X_SPACING;
 
-        let is_hovered: bool = match maybe_hovered_card {
-            Some(hovered_card) => column_index == hovered_card.0,
-            None => false,
-        };
+        let is_hovered = column_index == hovered_col_idx && empty_hand_slot_count != 0;
+        let is_matching_hovered = fitting_other_matching.contains(&column_index);
+        let cant_fit_in_hand = not_fitting_other_matching.contains(&column_index)
+            || column_index == hovered_col_idx && empty_hand_slot_count == 0;
 
-        let is_matching_hovered: bool = if let Some(hovered_card) = maybe_hovered_card {
-            let hovered_card: &Card = hovered_card.1;
-            let matching_indexes: Vec<usize> =
-                slots_center_row_indexes_matching_card(hovered_card, ctx);
-            matching_indexes.contains(&column_index)
+        let status_highlight = if is_hovered {
+            Some(CardStatusHighlight::Hover)
+        } else if is_matching_hovered {
+            Some(CardStatusHighlight::MatchingHoveredCard)
+        } else if cant_fit_in_hand {
+            Some(CardStatusHighlight::WouldNotFitInHand)
         } else {
-            false
+            None
         };
 
         draw_column(
             draw_queue,
             column_x,
-            column_y,
+            y,
             column,
             ctx,
             is_hovered,
             is_matching_hovered,
+            cant_fit_in_hand,
+            status_highlight,
         );
     }
 }
@@ -255,6 +292,8 @@ fn draw_column(
     ctx: &Context,
     is_hovered: bool,
     is_matching_hovered: bool,
+    cant_fit_in_hand: bool,
+    status_highlight: Option<CardStatusHighlight>,
 ) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_column_card_index(row_offset, column);
@@ -270,60 +309,60 @@ fn draw_column(
 
         let card_x: u16 = x;
         let card_y: u16 = card_y_signed as u16;
-
         let mut card_draw_calls: DrawCall = draw_calls_playing_card_small(card_x, card_y, card);
 
-        if row_offset == 0 {
-            if matches!(ctx.slot_machine.state, SlotMachineState::PostSpin) {
-                let interact_with_me_color = Rgba::from_f32(1.0, 1.0, 0.3, 1.0);
-                let highlight_color = Rgba::from_f32(0.0, 1.0, 0.0, 1.0);
+        let is_center_row: bool = row_offset == 0;
+        let is_post_spin_state: bool = matches!(ctx.slot_machine.state, SlotMachineState::PostSpin);
 
-                // card.rich_text.fg = card.rich_text.fg.lerp(flash_color, t * 0.75);
-                card_draw_calls.rich_text.bg = card_draw_calls
-                    .rich_text
-                    .bg
-                    .lerp(interact_with_me_color, 0.9);
+        if is_center_row && is_post_spin_state {
+            let interact_with_me_color = Rgba::from_f32(1.0, 1.0, 0.3, 1.0);
+            let highlight_color = Rgba::from_f32(0.0, 1.0, 0.0, 1.0);
+            let will_not_fit_color = Rgba::from_u8(255, 120, 50, 1.0);
 
-                let not_dragging: bool = matches!(ctx.mouse.card_drag, CardDragState::NotDragging);
-
-                if is_hovered && not_dragging {
-                    // Hovered card highlighting
-                    card_draw_calls.rich_text.fg =
-                        card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
-                    card_draw_calls.rich_text.bg =
-                        card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
-                }
-
-                if is_matching_hovered {
-                    // Matching card highlighting
-                    card_draw_calls.rich_text.fg =
-                        card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
-                    card_draw_calls.rich_text.bg =
-                        card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
-                }
-
-                // Matching cards highlighting
-                // let matching_column_indexes: Vec<usize> =
-                // slots_center_row_indexes_matching_card(card, ctx);
-                // card_draw_calls.rich_text.fg =
-                //     card_draw_calls.rich_text.fg.lerp(highlight_color, 0.5);
-                // card_draw_calls.rich_text.bg =
-                //     card_draw_calls.rich_text.bg.lerp(highlight_color, 0.8);
-                // }
-            }
-        } else {
-            let sigma: f32 = 1.5;
-            let gaussian_factor: f32 = (-(row_offset.pow(2) as f32) / (2.0 * sigma.powi(2))).exp();
-            let black = Rgba::from_u8(0, 0, 0, 1.0);
-            card_draw_calls.rich_text.fg = card_draw_calls
-                .rich_text
-                .fg
-                .lerp(black, 1.0 - gaussian_factor);
+            // card.rich_text.fg = card.rich_text.fg.lerp(flash_color, t * 0.75);
             card_draw_calls.rich_text.bg = card_draw_calls
                 .rich_text
                 .bg
-                .lerp(black, 1.0 - gaussian_factor);
+                .lerp(interact_with_me_color, 0.9);
+
+            let not_dragging: bool = matches!(ctx.mouse.card_drag, CardDragState::NotDragging);
+
+            if is_hovered && not_dragging {
+                // Hovered card highlighting
+                card_draw_calls.rich_text.fg =
+                    card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
+                card_draw_calls.rich_text.bg =
+                    card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
+            }
+
+            if is_matching_hovered {
+                // Matching card highlighting
+                card_draw_calls.rich_text.fg =
+                    card_draw_calls.rich_text.fg.lerp(highlight_color, 0.2);
+                card_draw_calls.rich_text.bg =
+                    card_draw_calls.rich_text.bg.lerp(highlight_color, 1.0);
+            }
+
+            if cant_fit_in_hand {
+                card_draw_calls.rich_text.fg =
+                    card_draw_calls.rich_text.fg.lerp(will_not_fit_color, 0.2);
+                card_draw_calls.rich_text.bg =
+                    card_draw_calls.rich_text.bg.lerp(will_not_fit_color, 1.0);
+            }
         }
+
+        // Alpha shading for further neighbors
+        let sigma: f32 = 1.5;
+        let gaussian_factor: f32 = (-(row_offset.pow(2) as f32) / (2.0 * sigma.powi(2))).exp();
+        let color_black = Rgba::from_u8(0, 0, 0, 1.0);
+        card_draw_calls.rich_text.fg = card_draw_calls
+            .rich_text
+            .fg
+            .lerp(color_black, 1.0 - gaussian_factor);
+        card_draw_calls.rich_text.bg = card_draw_calls
+            .rich_text
+            .bg
+            .lerp(color_black, 1.0 - gaussian_factor);
 
         draw_queue.push(card_draw_calls);
     }

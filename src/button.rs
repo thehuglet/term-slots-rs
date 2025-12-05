@@ -15,6 +15,7 @@ pub struct Button {
     pub color: Rgba,
     pub on_click: Box<dyn Fn(&mut Context)>,
     pub enabled_when: fn(&Context) -> bool,
+    pub allow_rmb: bool,
 }
 
 pub fn get_button_at(buttons: &[Button], x: u16, y: u16) -> Option<&Button> {
