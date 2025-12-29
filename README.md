@@ -8,6 +8,19 @@
 
 ![Release Header](https://github.com/thehuglet/term-slots-rs/blob/main/assets/release-header.png)
 
+## Bragging section
+- The game is tiny with no assets, sitting at less than 1MB for Linux and less than 0.5MB for Windows as of `v0.3.0`
+- Looks charming and unlike a terminal game according to playtesters
+- Still has thousands of frames to spare on the lowest end hardware I could find, even with CPU shaders in play.
+- It runs on a custom low level terminal renderer I wrote, some of it's notable features:
+    - Utilizes double buffering to avoid flickering
+    - Uses dirty rectangles to save A LOT of frame time
+    - Adds support for the alpha channel
+- Features CPU frag shaders:
+    - LUT Gamma correction (near zero performance impact)
+    - LUT Vignette (noticeable performance impact)
+    - Background noise shader (used for the green "table" parts of the UI, highest performance impact)
+
 ## Running the Game
 
 1. Grab the latest binary from [releases](https://github.com/thehuglet/term-slots-rs/releases):
