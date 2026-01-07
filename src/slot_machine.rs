@@ -1,10 +1,15 @@
 use crate::{
     card::{Card, draw_calls_playing_card_small},
     card_ops::CardDragState,
-    constants::{SLOTS_COLUMNS_X_SPACING, SLOTS_MAX_COLUMN_COUNT, SLOTS_NEIGHBOR_ROW_COUNT},
     context::Context,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect, point_in_rect},
 };
+
+pub const SLOTS_ORIGIN_X: u16 = 7;
+pub const SLOTS_ORIGIN_Y: u16 = 5;
+pub const SLOTS_COLUMNS_X_SPACING: u16 = 4;
+pub const SLOTS_MAX_COLUMN_COUNT: u16 = 6;
+pub const SLOTS_NEIGHBOR_ROW_COUNT: i16 = 3;
 
 pub enum SlotMachineState {
     Idle,
@@ -293,7 +298,7 @@ fn draw_column(
     is_hovered: bool,
     is_matching_hovered: bool,
     cant_fit_in_hand: bool,
-    status_highlight: Option<CardStatusHighlight>,
+    _status_highlight: Option<CardStatusHighlight>,
 ) {
     for row_offset in -SLOTS_NEIGHBOR_ROW_COUNT..SLOTS_NEIGHBOR_ROW_COUNT + 1 {
         let card_index: usize = get_column_card_index(row_offset, column);

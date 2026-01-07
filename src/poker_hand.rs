@@ -2,7 +2,6 @@ use std::cmp::Reverse;
 
 use crate::{
     card::{Card, Rank, Suit},
-    card_slot::CardSlot,
     context::Context,
 };
 

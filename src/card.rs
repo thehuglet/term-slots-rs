@@ -3,6 +3,9 @@ use crate::{
     renderer::{DrawCall, Rgba, RichText},
 };
 
+pub const BIG_CARD_WIDTH: u16 = 3;
+pub const BIG_CARD_HEIGHT: u16 = 3;
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Suit {
     Spade,

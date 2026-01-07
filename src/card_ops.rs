@@ -1,12 +1,10 @@
 use crate::{
-    card::{Card, draw_calls_playing_card_big},
-    constants::{
-        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
-        HAND_ORIGIN_Y, SLOTS_ORIGIN_X, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
-    },
+    card::{BIG_CARD_HEIGHT, BIG_CARD_WIDTH, Card, draw_calls_playing_card_big},
     context::Context,
+    hand::{HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y},
     poker_hand::update_current_poker_hand,
     renderer::{DrawCall, Rgba, draw_rect, point_in_rect},
+    table::{TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y},
 };
 
 #[derive(Clone)]
@@ -42,8 +40,8 @@ pub fn get_valid_drop_destination(
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         );
 
         if destination_is_locked {
@@ -70,8 +68,8 @@ pub fn get_valid_drop_destination(
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         );
 
         if destination_is_source || hitbox_check_failed {
@@ -141,8 +139,8 @@ pub fn draw_dragged_card(draw_queue: &mut Vec<DrawCall>, card: &Card, ctx: &mut 
         draw_queue,
         anchor_x - 1,
         anchor_y + 1,
-        BIG_PLAYING_CARD_WIDTH,
-        BIG_PLAYING_CARD_HEIGHT,
+        BIG_CARD_WIDTH,
+        BIG_CARD_HEIGHT,
         Rgba::from_f32(0.0, 0.0, 0.0, 0.13),
     );
 

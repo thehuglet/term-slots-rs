@@ -3,20 +3,18 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseButton, MouseEventKind};
 
 use crate::{
+    TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
     button::{Button, get_button_at},
-    card::Card,
+    card::{BIG_CARD_HEIGHT, BIG_CARD_WIDTH, Card},
     card_ops::{
         CardDragAndDropLocation, CardDragState, delete_card_at, get_valid_drop_destination,
         location_has_card, place_card_at, swap_cards,
     },
-    constants::{
-        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, HAND_CARD_X_SPACING, HAND_ORIGIN_X,
-        HAND_ORIGIN_Y, HAND_SLOT_COUNT, TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
-        TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
-    },
     context::Context,
+    hand::{HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT},
     poker_hand::update_current_poker_hand,
     renderer::{Screen, point_in_rect},
+    table::{TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT},
 };
 
 #[derive(PartialEq)]
@@ -89,7 +87,7 @@ fn on_left_click_down(ctx: &mut Context) {
         .enumerate()
         .filter_map(|(index, slot)| slot.card.as_ref().map(|card| (index, slot, card)));
 
-    for (index, slot, card) in table_slots_with_cards {
+    for (index, _, card) in table_slots_with_cards {
         let x1: u16 = TABLE_ORIGIN_X + index as u16 * TABLE_CARD_X_SPACING;
         let y1: u16 = TABLE_ORIGIN_Y;
 
@@ -98,8 +96,8 @@ fn on_left_click_down(ctx: &mut Context) {
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
@@ -115,7 +113,7 @@ fn on_left_click_down(ctx: &mut Context) {
         .enumerate()
         .filter_map(|(index, slot)| slot.card.as_ref().map(|card| (index, slot, card)));
 
-    for (index, slot, card) in hand_slots_with_cards {
+    for (index, _, card) in hand_slots_with_cards {
         let x1: u16 = HAND_ORIGIN_X + index as u16 * HAND_CARD_X_SPACING;
         let y1: u16 = HAND_ORIGIN_Y;
 
@@ -124,8 +122,8 @@ fn on_left_click_down(ctx: &mut Context) {
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         ) {
             ctx.mouse.card_drag = CardDragState::Dragging {
                 card: *card,
@@ -189,8 +187,8 @@ fn on_right_click_down(ctx: &mut Context, buttons: &[Button]) {
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         );
         let source_slot_empty: bool = ctx.table_card_slots[table_slot_index as usize]
             .card
@@ -239,8 +237,8 @@ fn on_right_click_down(ctx: &mut Context, buttons: &[Button]) {
             ctx.mouse.y,
             x1,
             y1,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
         );
         let source_slot_empty: bool = ctx.hand_card_slots[hand_slot_index as usize].card.is_none();
 

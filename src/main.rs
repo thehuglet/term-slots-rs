@@ -30,18 +30,13 @@ use std::{
 
 use crate::{
     button::{Button, draw_button},
-    card::{Card, Rank, Suit},
+    card::Card,
     card_ops::{CardDragState, draw_dragged_card},
-    card_slot::CardSlot,
-    constants::{
-        HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SIDEBAR_BORDER_X, SLOTS_COLUMNS_X_SPACING,
-        SLOTS_NEIGHBOR_ROW_COUNT, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y, TABLE_ORIGIN_X, TABLE_ORIGIN_Y,
-        TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
-    },
+    constants::SIDEBAR_BORDER_X,
     context::{Context, ImpulseId},
     fps_counter::draw_fps_counter,
     fps_limiter::FPSLimiter,
-    hand::{draw_hand, draw_hand_card_slots},
+    hand::{HAND_ORIGIN_X, HAND_ORIGIN_Y, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
     poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
     renderer::{
@@ -50,13 +45,17 @@ use crate::{
     },
     shader::{apply_gamma, apply_vignette, draw_bg_shader},
     slot_machine::{
-        SlotMachineColumn, SlotMachineState, calc_column_spin_duration_sec, draw_slots,
-        draw_slots_column_shadows, draw_slots_panel, get_column_card_index, slots_are_spinning,
+        SLOTS_COLUMNS_X_SPACING, SLOTS_NEIGHBOR_ROW_COUNT, SLOTS_ORIGIN_X, SLOTS_ORIGIN_Y,
+        SlotMachineState, calc_column_spin_duration_sec, draw_slots, draw_slots_column_shadows,
+        draw_slots_panel, get_column_card_index, slots_are_spinning,
         slots_center_row_indexes_matching_card, spin_cost, spin_slots_column,
     },
-    table::{draw_table, draw_table_card_slots},
+    table::{TABLE_ORIGIN_X, TABLE_ORIGIN_Y, draw_table, draw_table_card_slots},
     utils::center_text_unicode,
 };
+
+pub const TERM_SCREEN_WIDTH: u16 = 54;
+pub const TERM_SCREEN_HEIGHT: u16 = 30;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();

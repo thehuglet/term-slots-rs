@@ -1,15 +1,15 @@
 use crate::{
-    card::{Card, draw_calls_playing_card_big},
+    card::{BIG_CARD_HEIGHT, BIG_CARD_WIDTH, draw_calls_playing_card_big},
     card_ops::{CardDragAndDropLocation, CardDragState},
-    constants::{
-        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, TABLE_CARD_X_SPACING,
-        TABLE_SLOT_COUNT,
-    },
+    constants::CARD_SLOT_COLOR,
     context::Context,
-    poker_hand::PokerHand,
     renderer::{DrawCall, Hsl, Rgba, RichText, draw_rect},
-    utils::iter_some,
 };
+
+pub const TABLE_ORIGIN_X: u16 = 9;
+pub const TABLE_ORIGIN_Y: u16 = 14;
+pub const TABLE_CARD_X_SPACING: u16 = 4;
+pub const TABLE_SLOT_COUNT: u16 = 5;
 
 pub fn draw_table(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, ctx: &Context) {
     let slots_with_cards = ctx
@@ -70,8 +70,8 @@ pub fn draw_table_card_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
             draw_queue,
             local_x as i16,
             y as i16,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
             bg_color,
         );
 

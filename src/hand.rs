@@ -1,13 +1,15 @@
 use crate::{
-    card::draw_calls_playing_card_big,
+    card::{BIG_CARD_HEIGHT, BIG_CARD_WIDTH, draw_calls_playing_card_big},
     card_ops::{CardDragAndDropLocation, CardDragState},
-    constants::{
-        BIG_PLAYING_CARD_HEIGHT, BIG_PLAYING_CARD_WIDTH, CARD_SLOT_COLOR, HAND_CARD_X_SPACING,
-        HAND_SLOT_COUNT,
-    },
+    constants::CARD_SLOT_COLOR,
     context::{Context, ImpulseId},
     renderer::{DrawCall, Hsl, Rgba, draw_rect},
 };
+
+pub const HAND_ORIGIN_X: u16 = 5;
+pub const HAND_ORIGIN_Y: u16 = 20;
+pub const HAND_CARD_X_SPACING: u16 = 4;
+pub const HAND_SLOT_COUNT: u16 = 7;
 
 pub fn draw_hand(draw_queue: &mut Vec<DrawCall>, ctx: &Context) {
     let slots_with_cards = ctx
@@ -76,8 +78,8 @@ pub fn draw_hand_card_slots(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16) {
             draw_queue,
             (x + n * HAND_CARD_X_SPACING) as i16,
             y as i16,
-            BIG_PLAYING_CARD_WIDTH,
-            BIG_PLAYING_CARD_HEIGHT,
+            BIG_CARD_WIDTH,
+            BIG_CARD_HEIGHT,
             CARD_SLOT_COLOR,
         );
     }

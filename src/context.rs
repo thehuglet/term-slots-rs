@@ -1,19 +1,17 @@
-use std::collections::{HashMap, hash_map};
+use std::collections::HashMap;
 
 use crate::{
-    card::{Card, standard_52_deck},
+    TERM_SCREEN_HEIGHT, TERM_SCREEN_WIDTH,
+    card::standard_52_deck,
     card_ops::CardDragState,
     card_slot::{CardSlot, build_card_slots},
-    constants::{
-        HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT, SLOTS_MAX_COLUMN_COUNT,
-        TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT, TERM_SCREEN_HEIGHT,
-        TERM_SCREEN_WIDTH,
-    },
     fps_counter::FPSCounter,
+    hand::{HAND_CARD_X_SPACING, HAND_ORIGIN_X, HAND_ORIGIN_Y, HAND_SLOT_COUNT},
     poker_hand::PokerHand,
     renderer::Screen,
     shader::{build_gamma_lut, build_vignette_lut},
     slot_machine::{SlotMachine, SlotMachineColumn},
+    table::{TABLE_CARD_X_SPACING, TABLE_ORIGIN_X, TABLE_ORIGIN_Y, TABLE_SLOT_COUNT},
 };
 
 pub struct Context {
