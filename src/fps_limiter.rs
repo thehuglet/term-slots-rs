@@ -30,8 +30,7 @@ impl FPSLimiter {
 }
 
 pub fn wait_for_next_frame(fps_limiter: &mut FPSLimiter) -> f32 {
-    let is_uncapped: bool = fps_limiter.target_frametime == Duration::ZERO;
-    if is_uncapped {
+    if fps_limiter.target_frametime == Duration::ZERO {
         let now: Instant = Instant::now();
         let dt: f32 = now
             .duration_since(fps_limiter.next_frame_timestamp - fps_limiter.target_frametime)
@@ -40,33 +39,28 @@ pub fn wait_for_next_frame(fps_limiter: &mut FPSLimiter) -> f32 {
         return dt;
     }
 
-    let target_time: Instant = fps_limiter.next_frame_timestamp;
-    let mut now: Instant = Instant::now();
-
     // Sleep until close to target
-    while now + fps_limiter.spin_reserve_sec < target_time {
-        let remaining: Duration = target_time - now - fps_limiter.spin_reserve_sec;
+    while Instant::now() + fps_limiter.spin_reserve_sec < fps_limiter.next_frame_timestamp {
+        let remaining: Duration =
+            fps_limiter.next_frame_timestamp - Instant::now() - fps_limiter.spin_reserve_sec;
         sleep(fps_limiter.poll_interval_sec.min(remaining));
-        now = Instant::now();
     }
 
     // Busy wait at the end for precision
-    while Instant::now() < target_time {
+    while Instant::now() < fps_limiter.next_frame_timestamp {
         std::hint::spin_loop();
     }
 
-    let end: Instant = Instant::now();
-
-    let dt: f32 = end
+    let dt: f32 = Instant::now()
         .duration_since(fps_limiter.next_frame_timestamp - fps_limiter.target_frametime)
         .as_secs_f32();
 
-    fps_limiter.next_frame_timestamp = target_time + fps_limiter.target_frametime;
-
-    let frame_is_late: bool = end > fps_limiter.next_frame_timestamp;
-    if frame_is_late {
-        fps_limiter.next_frame_timestamp = end + fps_limiter.target_frametime;
-    }
+    let frame_is_late: bool = Instant::now() > fps_limiter.next_frame_timestamp;
+    fps_limiter.next_frame_timestamp = if frame_is_late {
+        Instant::now() + fps_limiter.target_frametime
+    } else {
+        fps_limiter.next_frame_timestamp + fps_limiter.target_frametime
+    };
 
     dt
 }
