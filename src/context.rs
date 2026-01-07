@@ -67,7 +67,7 @@ impl Default for Context {
                     TERM_SCREEN_HEIGHT as usize,
                     1.3,
                     2.0,
-                    0.6,
+                    0.9,
                 ),
             },
             screen: Screen::new(TERM_SCREEN_WIDTH, TERM_SCREEN_HEIGHT, (0, 0, 0)),
