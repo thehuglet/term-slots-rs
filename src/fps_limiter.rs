@@ -2,17 +2,17 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 pub struct FPSLimiter {
-    target: Duration,
-    next_frame: Instant,
-    poll_interval: Duration,
-    spin_reserve: Duration,
+    target_frametime: Duration,
+    next_frame_timestamp: Instant,
+    poll_interval_sec: Duration,
+    spin_reserve_sec: Duration,
 }
 
 impl FPSLimiter {
     pub fn new(fps: f32, poll_interval_sec: f32, spin_reserve_sec: f32) -> Self {
         let fps_is_uncapped: bool = fps <= 0.0;
 
-        let target = if fps_is_uncapped {
+        let target: Duration = if fps_is_uncapped {
             Duration::ZERO
         } else {
             Duration::from_secs_f32(1.0 / fps)
@@ -21,50 +21,52 @@ impl FPSLimiter {
         let now = Instant::now();
 
         Self {
-            target,
-            next_frame: now + target,
-            poll_interval: Duration::from_secs_f32(poll_interval_sec),
-            spin_reserve: Duration::from_secs_f32(spin_reserve_sec),
+            target_frametime: target,
+            next_frame_timestamp: now + target,
+            poll_interval_sec: Duration::from_secs_f32(poll_interval_sec),
+            spin_reserve_sec: Duration::from_secs_f32(spin_reserve_sec),
         }
     }
+}
 
-    pub fn wait(&mut self) -> f32 {
-        if self.target == Duration::ZERO {
-            // Uncapped -> Return delta since last call
-            let now = Instant::now();
-            let dt = now
-                .duration_since(self.next_frame - self.target)
-                .as_secs_f32();
-            self.next_frame = now;
-            return dt;
-        }
-
-        let target_time: Instant = self.next_frame;
-        let mut now = Instant::now();
-
-        // Sleep until close to target
-        while now + self.spin_reserve < target_time {
-            let remaining: Duration = target_time - now - self.spin_reserve;
-            sleep(self.poll_interval.min(remaining));
-            now = Instant::now();
-        }
-
-        // Spin for final precision
-        while Instant::now() < target_time {}
-
-        let end = Instant::now();
-
-        let dt: f32 = end
-            .duration_since(self.next_frame - self.target)
+pub fn wait_for_next_frame(fps_limiter: &mut FPSLimiter) -> f32 {
+    let is_uncapped: bool = fps_limiter.target_frametime == Duration::ZERO;
+    if is_uncapped {
+        let now: Instant = Instant::now();
+        let dt: f32 = now
+            .duration_since(fps_limiter.next_frame_timestamp - fps_limiter.target_frametime)
             .as_secs_f32();
-
-        // Schedule next frame
-        self.next_frame = target_time + self.target;
-
-        if end > self.next_frame {
-            self.next_frame = end + self.target;
-        }
-
-        dt
+        fps_limiter.next_frame_timestamp = now;
+        return dt;
     }
+
+    let target_time: Instant = fps_limiter.next_frame_timestamp;
+    let mut now: Instant = Instant::now();
+
+    // Sleep until close to target
+    while now + fps_limiter.spin_reserve_sec < target_time {
+        let remaining: Duration = target_time - now - fps_limiter.spin_reserve_sec;
+        sleep(fps_limiter.poll_interval_sec.min(remaining));
+        now = Instant::now();
+    }
+
+    // Busy wait at the end for precision
+    while Instant::now() < target_time {
+        std::hint::spin_loop();
+    }
+
+    let end: Instant = Instant::now();
+
+    let dt: f32 = end
+        .duration_since(fps_limiter.next_frame_timestamp - fps_limiter.target_frametime)
+        .as_secs_f32();
+
+    fps_limiter.next_frame_timestamp = target_time + fps_limiter.target_frametime;
+
+    let frame_is_late: bool = end > fps_limiter.next_frame_timestamp;
+    if frame_is_late {
+        fps_limiter.next_frame_timestamp = end + fps_limiter.target_frametime;
+    }
+
+    dt
 }

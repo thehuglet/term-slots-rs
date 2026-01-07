@@ -35,7 +35,7 @@ use crate::{
     constants::SIDEBAR_BORDER_X,
     context::{Context, ImpulseId},
     fps_counter::draw_fps_counter,
-    fps_limiter::FPSLimiter,
+    fps_limiter::{FPSLimiter, wait_for_next_frame},
     hand::{HAND_ORIGIN_X, HAND_ORIGIN_Y, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
     poker_hand::{PokerHand, eval_poker_hand, update_current_poker_hand},
@@ -98,7 +98,8 @@ fn main() -> io::Result<()> {
     }
 
     'game_loop: loop {
-        let dt: f32 = fps_limiter.wait();
+        // let dt: f32 = fps_limiter.wait();
+        let dt: f32 = wait_for_next_frame(&mut fps_limiter);
 
         if tick(&mut ctx, dt as f32, &mut stdout)? == ProgramStatus::Exit {
             break 'game_loop;
