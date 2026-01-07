@@ -1,29 +1,31 @@
 use crate::renderer::{DrawCall, RichText};
 
 pub struct FPSCounter {
-    ema: f32,
-    alpha: f32,
+    fps_ema: f32,
+    smoothing_factor: f32,
 }
 
 impl FPSCounter {
     pub fn new(alpha: f32) -> Self {
-        Self { ema: 0.0, alpha }
-    }
-
-    pub fn update(&mut self, dt: f32) {
-        if dt <= 0.0 {
-            return;
-        }
-        let inst = 1.0 / dt;
-        if self.ema <= 0.0 {
-            self.ema = inst;
-        } else {
-            self.ema = self.ema * (1.0 - self.alpha) + inst * self.alpha;
+        Self {
+            fps_ema: 0.0,
+            smoothing_factor: alpha,
         }
     }
+}
 
-    pub fn fps(&self) -> f32 {
-        self.ema
+pub fn update_fps_counter(fps_counter: &mut FPSCounter, dt: f32) {
+    if dt <= 0.0 {
+        return;
+    }
+
+    let current_fps: f32 = 1.0 / dt;
+
+    if fps_counter.fps_ema <= 0.0 {
+        fps_counter.fps_ema = current_fps;
+    } else {
+        fps_counter.fps_ema = fps_counter.fps_ema * (1.0 - fps_counter.smoothing_factor)
+            + current_fps * fps_counter.smoothing_factor;
     }
 }
 
@@ -31,6 +33,6 @@ pub fn draw_fps_counter(draw_queue: &mut Vec<DrawCall>, x: u16, y: u16, fps_coun
     draw_queue.push(DrawCall {
         x,
         y,
-        rich_text: RichText::new(format!("FPS: {:2.0}", fps_counter.fps())),
+        rich_text: RichText::new(format!("FPS: {:2.0}", fps_counter.fps_ema)),
     });
 }

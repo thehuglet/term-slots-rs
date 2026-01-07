@@ -34,7 +34,7 @@ use crate::{
     card_ops::{CardDragState, draw_dragged_card},
     constants::SIDEBAR_BORDER_X,
     context::{Context, ImpulseId},
-    fps_counter::draw_fps_counter,
+    fps_counter::{draw_fps_counter, update_fps_counter},
     fps_limiter::{FPSLimiter, wait_for_next_frame},
     hand::{HAND_ORIGIN_X, HAND_ORIGIN_Y, draw_hand, draw_hand_card_slots},
     input::{ProgramStatus, drain_input, resolve_input},
@@ -98,14 +98,13 @@ fn main() -> io::Result<()> {
     }
 
     'game_loop: loop {
-        // let dt: f32 = fps_limiter.wait();
         let dt: f32 = wait_for_next_frame(&mut fps_limiter);
 
         if tick(&mut ctx, dt as f32, &mut stdout)? == ProgramStatus::Exit {
             break 'game_loop;
         }
 
-        ctx.fps_counter.update(dt);
+        update_fps_counter(&mut ctx.fps_counter, dt);
         ctx.game_time += dt;
     }
 
