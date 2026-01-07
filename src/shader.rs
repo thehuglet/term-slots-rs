@@ -80,7 +80,7 @@ pub fn draw_bg_shader(
 
     for x in origin_x..origin_x + w {
         for y in origin_y..origin_y + h {
-            let base_color = Rgba::from_f32(0.0, 0.2, 0.0, 1.0);
+            let base_color = Rgba::from_f32(0.03, 0.16, 0.03, 1.0);
 
             let frequency: f32 = 1.5;
             let amplitude: f32 = 0.018;
