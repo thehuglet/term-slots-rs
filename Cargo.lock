@@ -311,6 +311,7 @@ dependencies = [
 name = "term-slots"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "crossterm",
  "rand",
  "unicode-width",
