@@ -22,7 +22,13 @@ use std::io;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 
 use crate::engine::{
-    Engine, draw::draw_text, end_frame, exit_cleanup, init, input::poll_input, start_frame,
+    Engine, Pos, Size,
+    color::Color,
+    draw::{draw_fps_counter, draw_rect, draw_text},
+    end_frame, exit_cleanup, init,
+    input::poll_input,
+    rich_text::RichText,
+    start_frame,
 };
 
 // use crossterm::{
@@ -70,7 +76,7 @@ pub const TERM_ROWS: u16 = 30;
 fn main() -> io::Result<()> {
     let mut engine = Engine::new(TERM_COLS, TERM_ROWS)
         .title("term-slots-rs")
-        .limit_fps(144);
+        .limit_fps(0);
 
     init(&mut engine)?;
 
@@ -88,7 +94,49 @@ fn main() -> io::Result<()> {
             }
         }
 
-        draw_text(&mut engine, 0, 0, "a-b-c-d-e-f-g-h-i");
+        draw_text(&mut engine, Pos::new(-3, 3), "a-b-c-d-e-f-g-h-i");
+        draw_fps_counter(&mut engine, Pos::new(0, 0));
+
+        // Regular bg blending test
+        // draw_text(
+        //     &mut engine,
+        //     Pos::new(3, 5),
+        //     RichText::new(" ")
+        //         .fg(Color::new(0, 0, 0, 255))
+        //         .bg(Color::BLACK),
+        // );
+
+        draw_text(
+            &mut engine,
+            Pos::new(3, 5),
+            RichText::new("@").fg(Color::new(0, 255, 0, 20)),
+        );
+        draw_text(
+            &mut engine,
+            Pos::new(5, 5),
+            RichText::new("@").fg(Color::BLUE),
+        );
+
+        draw_rect(&mut engine, Pos::new(5, 5), Size::new(4, 2), Color::BLUE);
+        draw_rect(
+            &mut engine,
+            Pos::new(7, 6),
+            Size::new(4, 2),
+            Color::new(255, 0, 0, 127),
+        );
+
+        // Box shadow over bg and fg test
+        draw_rect(
+            &mut engine,
+            Pos::new(13, 5),
+            Size::new(4, 2),
+            Color::new(255, 255, 255, 50),
+        );
+        draw_text(
+            &mut engine,
+            Pos::new(15, 6),
+            RichText::new("ab").fg(Color::BLACK),
+        );
 
         end_frame(&mut engine)?;
     }
@@ -490,15 +538,15 @@ fn main() -> io::Result<()> {
 
 //     let diff: Vec<(u16, u16, &Cell)> = diff_buffers(&ctx.screen.old_buffer, &ctx.screen.new_buffer);
 
-//     for (x, y, cell) in diff {
-//         queue!(
-//             stdout,
-//             cursor::MoveTo(x, y),
-//             SetStyle(build_crossterm_content_style(cell)),
-//             Print(cell.ch),
-//             ResetColor,
-//         )?;
-//     }
+// for (x, y, cell) in diff {
+//     queue!(
+//         stdout,
+//         cursor::MoveTo(x, y),
+//         SetStyle(build_crossterm_content_style(cell)),
+//         Print(cell.ch),
+//         ResetColor,
+//     )?;
+// }
 
 //     // This doesnt work on linux for some reason
 //     ctx.resize_update_accumulator += dt;
