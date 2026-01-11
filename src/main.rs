@@ -17,10 +17,12 @@
 mod engine;
 mod renderer_old;
 
+use std::io;
+
 use crossterm::event::{Event, KeyCode, KeyEvent};
 
 use crate::engine::{
-    Engine, end_frame, exit_cleanup, init, input::poll_input, screen::Screen, start_frame,
+    Engine, draw::draw_text, end_frame, exit_cleanup, init, input::poll_input, start_frame,
 };
 
 // use crossterm::{
@@ -62,18 +64,15 @@ use crate::engine::{
 //     utils::center_text_unicode,
 // };
 
-// pub const TERM_SCREEN_WIDTH: u16 = 54;
-// pub const TERM_SCREEN_HEIGHT: u16 = 30;
-
 pub const TERM_COLS: u16 = 54;
 pub const TERM_ROWS: u16 = 30;
 
-fn main() {
+fn main() -> io::Result<()> {
     let mut engine = Engine::new(TERM_COLS, TERM_ROWS)
         .title("term-slots-rs")
         .limit_fps(144);
 
-    let _ = init(&mut engine);
+    init(&mut engine)?;
 
     'game_loop: loop {
         start_frame(&mut engine);
@@ -89,10 +88,13 @@ fn main() {
             }
         }
 
-        end_frame(&mut engine);
+        draw_text(&mut engine, 0, 0, "a-b-c-d-e-f-g-h-i");
+
+        end_frame(&mut engine)?;
     }
 
-    exit_cleanup(&mut engine);
+    exit_cleanup(&mut engine)?;
+    Ok(())
 }
 
 // fn main() -> io::Result<()> {
