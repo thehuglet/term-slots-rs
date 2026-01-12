@@ -24,10 +24,10 @@ use crossterm::event::{Event, KeyCode, KeyEvent};
 use crate::engine::{
     Engine, Pos, Size,
     color::Color,
-    draw::{draw_fps_counter, draw_rect, draw_text},
+    draw::{draw_fps_counter, draw_rect, draw_text, fill_screen},
     end_frame, exit_cleanup, init,
     input::poll_input,
-    rich_text::RichText,
+    rich_text::{Attributes, RichText},
     start_frame,
 };
 
@@ -70,11 +70,11 @@ use crate::engine::{
 //     utils::center_text_unicode,
 // };
 
-pub const TERM_COLS: u16 = 54;
-pub const TERM_ROWS: u16 = 30;
+pub const TERM_COLS: u16 = 30;
+pub const TERM_ROWS: u16 = 20;
 
 fn main() -> io::Result<()> {
-    let mut engine = Engine::new(TERM_COLS, TERM_ROWS)
+    let mut engine: Engine = Engine::new(TERM_COLS, TERM_ROWS)
         .title("term-slots-rs")
         .limit_fps(0);
 
@@ -82,6 +82,9 @@ fn main() -> io::Result<()> {
 
     'game_loop: loop {
         start_frame(&mut engine);
+
+        fill_screen(&mut engine, Color::new(80, 80, 80, 255));
+        draw_fps_counter(&mut engine, Pos::new(0, 0));
 
         for event in poll_input() {
             if let Event::Key(KeyEvent {
@@ -94,8 +97,7 @@ fn main() -> io::Result<()> {
             }
         }
 
-        draw_text(&mut engine, Pos::new(-3, 3), "a-b-c-d-e-f-g-h-i");
-        draw_fps_counter(&mut engine, Pos::new(0, 0));
+        // draw_text(&mut engine, Pos::new(-3, 3), "a-b-c-d-e-f-g-h-i");
 
         // Regular bg blending test
         // draw_text(
@@ -106,36 +108,98 @@ fn main() -> io::Result<()> {
         //         .bg(Color::BLACK),
         // );
 
-        draw_text(
-            &mut engine,
-            Pos::new(3, 5),
-            RichText::new("@").fg(Color::new(0, 255, 0, 20)),
-        );
-        draw_text(
-            &mut engine,
-            Pos::new(5, 5),
-            RichText::new("@").fg(Color::BLUE),
-        );
-
-        draw_rect(&mut engine, Pos::new(5, 5), Size::new(4, 2), Color::BLUE);
         draw_rect(
             &mut engine,
-            Pos::new(7, 6),
-            Size::new(4, 2),
+            Pos::square(1, 4),
+            Size::square(2, 2),
+            Color::BLACK,
+        );
+        draw_text(
+            &mut engine,
+            Pos::square(1, 4),
+            RichText::new("ab")
+                .fg(Color::WHITE)
+                .attributes(Attributes::ITALIC),
+        );
+
+        draw_text(
+            &mut engine,
+            Pos::square(2, 4),
+            RichText::new("@@")
+                .fg(Color::RED)
+                .attributes(Attributes::BOLD),
+        );
+
+        draw_text(
+            &mut engine,
+            Pos::square(2, 5),
+            RichText::new("cd")
+                .fg(Color::WHITE)
+                .attributes(Attributes::BOLD),
+        );
+        draw_rect(
+            &mut engine,
+            Pos::square(2, 3),
+            Size::square(2, 2),
+            Color::new(255, 255, 255, 127),
+        );
+        draw_text(
+            &mut engine,
+            Pos::square(2, 3),
+            RichText::new("ab")
+                .fg(Color::BLACK)
+                .attributes(Attributes::ITALIC),
+        );
+        draw_text(
+            &mut engine,
+            Pos::square(3, 4),
+            RichText::new("cd")
+                .fg(Color::BLACK)
+                .attributes(Attributes::BOLD),
+        );
+
+        draw_rect(
+            &mut engine,
+            Pos::square(5, 4),
+            Size::square(2, 2),
+            Color::new(255, 255, 255, 127),
+        );
+
+        draw_text(
+            &mut engine,
+            Pos::square(5, 5),
+            RichText::new("AB").fg(Color::WHITE),
+        );
+
+        draw_rect(
+            &mut engine,
+            Pos::square(6, 3),
+            Size::square(2, 2),
             Color::new(255, 0, 0, 127),
+        );
+        draw_text(
+            &mut engine,
+            Pos::square(7, 3),
+            RichText::new("CD").fg(Color::RED),
         );
 
         // Box shadow over bg and fg test
         draw_rect(
             &mut engine,
-            Pos::new(13, 5),
-            Size::new(4, 2),
-            Color::new(255, 255, 255, 50),
+            Pos::square(9, 4),
+            Size::square(2, 2),
+            Color::WHITE,
         );
         draw_text(
             &mut engine,
-            Pos::new(15, 6),
-            RichText::new("ab").fg(Color::BLACK),
+            Pos::square(9, 4),
+            RichText::new("ABCD").fg(Color::GREEN),
+        );
+        draw_rect(
+            &mut engine,
+            Pos::square(10, 3),
+            Size::square(2, 2),
+            Color::new(0, 0, 0, 150),
         );
 
         end_frame(&mut engine)?;
