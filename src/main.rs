@@ -19,17 +19,19 @@ mod renderer_old;
 
 use std::io;
 
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::engine::{
     Engine, Pos, Size,
     color::Color,
-    draw::{draw_fps_counter, draw_rect, draw_text, fill_screen},
+    draw::{draw_braille_dot, draw_fps_counter, draw_rect, draw_text, fill_screen},
     end_frame, exit_cleanup, init,
     input::poll_input,
     rich_text::{Attributes, RichText},
     start_frame,
 };
+
+use std::f32::consts::PI;
 
 // use crossterm::{
 //     cursor,
@@ -70,20 +72,42 @@ use crate::engine::{
 //     utils::center_text_unicode,
 // };
 
-pub const TERM_COLS: u16 = 30;
+pub const TERM_COLS: u16 = 40;
 pub const TERM_ROWS: u16 = 20;
+
+// struct Data {}
 
 fn main() -> io::Result<()> {
     let mut engine: Engine = Engine::new(TERM_COLS, TERM_ROWS)
         .title("term-slots-rs")
-        .limit_fps(0);
+        .limit_fps(144);
 
     init(&mut engine)?;
+
+    let radius: f32 = 8.0;
+    let speed: f32 = 2.0;
+    let num_points: usize = 5;
+    let step: f32 = 2.0 * PI / num_points as f32;
+    let mut stop_rot = false;
 
     'game_loop: loop {
         start_frame(&mut engine);
 
-        fill_screen(&mut engine, Color::new(80, 80, 80, 255));
+        fill_screen(&mut engine, Color::BLACK);
+
+        for y in 0..TERM_ROWS {
+            for x in 0..TERM_COLS / 2 {
+                if (x + y) % 2 == 0 {
+                    draw_rect(
+                        &mut engine,
+                        Pos::square(x as i16, y as i16),
+                        Size::square(1, 1),
+                        Color::new(15, 7, 7, 255),
+                    );
+                }
+            }
+        }
+
         draw_fps_counter(&mut engine, Pos::new(0, 0));
 
         for event in poll_input() {
@@ -95,8 +119,102 @@ fn main() -> io::Result<()> {
                 println!("Quit!");
                 break 'game_loop;
             }
+
+            if let Event::Key(KeyEvent {
+                code: KeyCode::Char('w'),
+                kind: KeyEventKind::Press,
+                ..
+            }) = event
+            {
+                stop_rot = !stop_rot;
+            }
         }
 
+        fn draw_line(
+            engine: &mut Engine,
+            start: (f32, f32),
+            end: (f32, f32),
+            aspect_ratio: f32,
+            offset_x: i16,
+            offset_y: i16,
+        ) {
+            let dx = end.0 - start.0;
+            let dy = end.1 - start.1;
+            let steps = dx.abs().max(dy.abs()).ceil() as usize;
+
+            for i in 0..=steps {
+                let t = i as f32 / steps as f32;
+                let x = start.0 + dx * t;
+                let y = start.1 + dy * t;
+
+                let cell_x = (x / 2.0).floor() as i16;
+                let cell_y = y.floor() as i16;
+
+                let sub_x = (x / 2.0) - cell_x as f32;
+                let sub_y = y - cell_y as f32;
+
+                let dot_x = if sub_x < 0.5 { 0 } else { 1 };
+                let dot_y = (sub_y * 3.0).floor() as usize;
+
+                let final_x = cell_x + offset_x;
+                let final_y = cell_y + offset_y;
+
+                let alpha: f32 = {
+                    let frequency = 5.0;
+                    let phase = (final_x + final_y) as f32 / 5.0;
+                    let min = 0.3;
+                    let max = 1.0;
+
+                    min + (max - min) * 0.5 * ((frequency * engine.game_time + phase).sin() + 1.0)
+                };
+
+                draw_braille_dot(engine, Pos::square(final_x, final_y), dot_x, dot_y, alpha);
+            }
+        }
+
+        let sinewave_out: f32 = {
+            let amplitude = 400.0;
+            let frequency = 0.8;
+
+            amplitude * (frequency * engine.game_time).sin()
+        };
+
+        // First, collect the points
+        let mut points = Vec::new();
+
+        let angle: f32 = speed * sinewave_out * !stop_rot as u8 as f32 * 0.005;
+        let aspect_ratio: f32 = 2.0 / 1.0;
+
+        for n in 0..num_points {
+            let point_angle = angle + n as f32 * step;
+
+            let x: f32 = radius * point_angle.cos() * aspect_ratio;
+            let y: f32 = radius * point_angle.sin();
+
+            let cell_x = (x / 2.0).floor() as i16;
+            let cell_y = y.floor() as i16;
+
+            let sub_x = (x / 2.0) - cell_x as f32;
+            let sub_y = y - cell_y as f32;
+
+            let alpha = 1.0;
+
+            let dot_x = if sub_x < 0.5 { 0 } else { 1 };
+            let dot_y = (sub_y * 3.0).floor() as usize;
+
+            let pos = Pos::square(cell_x + 10, cell_y + 10);
+            // draw_braille_dot(&mut engine, pos, dot_x, dot_y, alpha);
+
+            points.push((x, y)); // store logical floats for line drawing
+        }
+
+        if num_points == 5 {
+            for i in 0..5 {
+                let start = points[i];
+                let end = points[(i + 2) % 5]; // skip one point for pentagram
+                draw_line(&mut engine, start, end, aspect_ratio, 10, 10);
+            }
+        }
         // draw_text(&mut engine, Pos::new(-3, 3), "a-b-c-d-e-f-g-h-i");
 
         // Regular bg blending test
@@ -108,99 +226,117 @@ fn main() -> io::Result<()> {
         //         .bg(Color::BLACK),
         // );
 
-        draw_rect(
-            &mut engine,
-            Pos::square(1, 4),
-            Size::square(2, 2),
-            Color::BLACK,
-        );
-        draw_text(
-            &mut engine,
-            Pos::square(1, 4),
-            RichText::new("ab")
-                .fg(Color::WHITE)
-                .attributes(Attributes::ITALIC),
-        );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(1, 4),
+        //     Size::square(2, 2),
+        //     Color::BLACK,
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(1, 4),
+        //     RichText::new("ab")
+        //         .fg(Color::WHITE)
+        //         .attributes(Attributes::ITALIC),
+        // );
 
-        draw_text(
-            &mut engine,
-            Pos::square(2, 4),
-            RichText::new("@@")
-                .fg(Color::RED)
-                .attributes(Attributes::BOLD),
-        );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(2, 4),
+        //     RichText::new("@@")
+        //         .fg(Color::RED)
+        //         .attributes(Attributes::BOLD),
+        // );
 
-        draw_text(
-            &mut engine,
-            Pos::square(2, 5),
-            RichText::new("cd")
-                .fg(Color::WHITE)
-                .attributes(Attributes::BOLD),
-        );
-        draw_rect(
-            &mut engine,
-            Pos::square(2, 3),
-            Size::square(2, 2),
-            Color::new(255, 255, 255, 127),
-        );
-        draw_text(
-            &mut engine,
-            Pos::square(2, 3),
-            RichText::new("ab")
-                .fg(Color::BLACK)
-                .attributes(Attributes::ITALIC),
-        );
-        draw_text(
-            &mut engine,
-            Pos::square(3, 4),
-            RichText::new("cd")
-                .fg(Color::BLACK)
-                .attributes(Attributes::BOLD),
-        );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(2, 5),
+        //     RichText::new("cd")
+        //         .fg(Color::WHITE)
+        //         .attributes(Attributes::BOLD),
+        // );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(2, 3),
+        //     Size::square(2, 2),
+        //     Color::new(255, 255, 255, 127),
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(2, 3),
+        //     RichText::new("ab")
+        //         .fg(Color::BLACK)
+        //         .attributes(Attributes::ITALIC),
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(3, 4),
+        //     RichText::new("cd")
+        //         .fg(Color::BLACK)
+        //         .attributes(Attributes::BOLD),
+        // );
 
-        draw_rect(
-            &mut engine,
-            Pos::square(5, 4),
-            Size::square(2, 2),
-            Color::new(255, 255, 255, 127),
-        );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(5, 4),
+        //     Size::square(2, 2),
+        //     Color::new(255, 255, 255, 127),
+        // );
 
-        draw_text(
-            &mut engine,
-            Pos::square(5, 5),
-            RichText::new("AB").fg(Color::WHITE),
-        );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(5, 5),
+        //     RichText::new("AB").fg(Color::WHITE),
+        // );
 
-        draw_rect(
-            &mut engine,
-            Pos::square(6, 3),
-            Size::square(2, 2),
-            Color::new(255, 0, 0, 127),
-        );
-        draw_text(
-            &mut engine,
-            Pos::square(7, 3),
-            RichText::new("CD").fg(Color::RED),
-        );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(6, 3),
+        //     Size::square(2, 2),
+        //     Color::new(255, 0, 0, 127),
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(7, 3),
+        //     RichText::new("CD").fg(Color::RED),
+        // );
 
-        // Box shadow over bg and fg test
-        draw_rect(
-            &mut engine,
-            Pos::square(9, 4),
-            Size::square(2, 2),
-            Color::WHITE,
-        );
-        draw_text(
-            &mut engine,
-            Pos::square(9, 4),
-            RichText::new("ABCD").fg(Color::GREEN),
-        );
-        draw_rect(
-            &mut engine,
-            Pos::square(10, 3),
-            Size::square(2, 2),
-            Color::new(0, 0, 0, 150),
-        );
+        // // Box shadow over bg and fg test
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(9, 4),
+        //     Size::square(2, 2),
+        //     Color::WHITE,
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(9, 4),
+        //     RichText::new("ABCD").fg(Color::GREEN),
+        // );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(10, 3),
+        //     Size::square(2, 2),
+        //     Color::new(0, 0, 0, 190),
+        // );
+
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(13, 4),
+        //     Size::square(2, 2),
+        //     Color::WHITE,
+        // );
+        // draw_text(
+        //     &mut engine,
+        //     Pos::square(13, 4),
+        //     RichText::new("ABCD").fg(Color::BLUE),
+        // );
+        // draw_rect(
+        //     &mut engine,
+        //     Pos::square(14, 3),
+        //     Size::square(2, 2),
+        //     Color::new(255, 255, 0, 255),
+        // );
 
         end_frame(&mut engine)?;
     }
