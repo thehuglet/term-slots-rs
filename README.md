@@ -8,7 +8,7 @@
 
 ![Release Header](https://github.com/thehuglet/term-slots-rs/blob/main/assets/release-header.png)
 
-## Bragging section
+## Technical details
 - The game is tiny with no assets, sitting at less than 1MB for Linux and less than 0.5MB for Windows as of `v0.3.0`
 - Looks charming and unlike a terminal game according to playtesters
 - Still has thousands of frames to spare on the lowest end hardware I could find, even with CPU shaders in play.
